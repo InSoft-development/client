@@ -117,7 +117,7 @@ int main(int argc, char*argv[])
     if (status.isGood())
     {
         // Read values one time
-        //status = pMyClient->read();
+        status = pMyClient->read();
 
 
         // Wait for user command.
@@ -126,23 +126,23 @@ int main(int argc, char*argv[])
         //getchar();
 
         // Create subscription
-        status_run = pMyClient->subscribe();
+//        status_run = pMyClient->subscribe();
 
-        if (status_run.isGood())
-        {
-            // Wait for user command.
-            getchar();
+//        if (status_run.isGood())
+//        {
+//            // Wait for user command.
+//            getchar();
 
-            // Delete subscription
-            status = pMyClient->unsubscribe();
-        }
+//            // Delete subscription
+//            status = pMyClient->unsubscribe();
+//        }
 
-        // Wait for user command.
-        //printf("\nPress Enter to disconnect\n");
-        //getchar();
+//        // Wait for user command.
+//        //printf("\nPress Enter to disconnect\n");
+//        //getchar();
 
-        // Disconnect from OPC UA Server
-        status = pMyClient->disconnect();
+//        // Disconnect from OPC UA Server
+//        status = pMyClient->disconnect();
     }
 
     // Close application

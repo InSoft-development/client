@@ -28,6 +28,10 @@
 
 #include "uabase.h"
 #include "uaclientsdk.h"
+#include <map>
+#include <string.h>
+#include <list>
+#include <sqlite3.h>
 
 class SampleSubscription;
 
@@ -55,6 +59,11 @@ public:
 private:
     UaSession*          m_pSession;
     SampleSubscription* m_pSampleSubscription;
+    int delta;
+    std::map<std::string,std::list<double>> slice_data;
+    std::vector<std::string> kks_array;
+    sqlite3 *db;
+    void init_db();
 };
 
 

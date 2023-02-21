@@ -38,9 +38,11 @@
 #include <fstream>
 #include <string.h>
 
-SampleClient::SampleClient(int delta)
+SampleClient::SampleClient(int d)
 {
     m_pSession = new UaSession();
+    db = NULL;
+    delta = d;
     m_pSampleSubscription = new SampleSubscription(delta);
 }
 
@@ -64,6 +66,56 @@ SampleClient::~SampleClient()
         delete m_pSession;
         m_pSession = NULL;
     }
+
+    if (db)
+        sqlite3_close(db);
+}
+
+static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
+   int i;
+   for(i = 0; i<argc; i++) {
+      printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+   }
+   printf("\n");
+   return 0;
+}
+
+void SampleClient::init_db()
+{
+    std::fstream infile("kks.csv");
+    std::string kks;
+
+    while (infile >> kks)
+    {
+        kks_array.push_back(kks);
+    }
+    /* Open database */
+    char *zErrMsg = 0;
+    int rc = sqlite3_open("data.sqlite", &db);
+    if( rc ) {
+       fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+    }
+    /* Create SQL statement */
+    std::string kks_string;
+    for (auto kks : kks_array)
+    {
+        kks_string += kks;
+        kks_string += "\" real, \"";
+    }
+    if (!kks_string.empty())
+        kks_string.erase(kks_string.size()-3);
+
+    std::string sql = std::string("DROP TABLE IF EXISTS synchro_data; CREATE TABLE synchro_data ( \"") + kks_string +
+                                  std::string(", \"timestamp\" timestamp with time zone NOT NULL );");
+    printf("%s\n",sql.c_str());
+    /* Execute SQL statement */
+    rc = sqlite3_exec(db, sql.c_str(), callback, 0, &zErrMsg);
+    if( rc != SQLITE_OK )
+    {
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        sqlite3_free(zErrMsg);
+    }
+
 }
 
 void SampleClient::connectionStatusChanged(
@@ -215,6 +267,16 @@ UaStatus SampleClient::read()
 		break;
     	}
     }
+
+//    for row in global_data:
+//                row["timestamp"] = "\'" + str(t1) + "\'"
+//                execute_string1 = "INSERT INTO synchro_data ("
+//                execute_string2 = ") VALUES("
+//                for d in row.keys():
+//                    execute_string1 += "\"" + str(d) + "\","
+//                    execute_string2 += str(row[d]) + ","
+//                execute_string = execute_string1[:-1] + execute_string2[:-1] + ")"
+
     return result;
 }
 
