@@ -25,6 +25,7 @@
 ******************************************************************************/
 #include "uaplatformlayer.h"
 #include "sampleclient.h"
+#include "uathread.h"
 #include <stdlib.h>
 #include <getopt.h>
 #include <string>
@@ -32,22 +33,25 @@
 
 UaStatus status_run;
 SampleClient* pMyClient;
+bool exit_flag = false;
 
 void signalHandler(int signum)
 {
+
 	   printf("Interrupt!");
-	   if (status_run.isGood())
-	   {
-		   pMyClient->unsubscribe();
-		   pMyClient->disconnect();
-	   }
-	   if (pMyClient)
-	   {
-		   delete pMyClient;
-		   pMyClient = NULL;
-	   }
-	   UaPlatformLayer::cleanup();
-	   exit(signum);
+       exit_flag = true;
+//	   if (status_run.isGood())
+//	   {
+//           //pMyClient->unsubscribe();
+//		   pMyClient->disconnect();
+//	   }
+//	   if (pMyClient)
+//	   {
+//		   delete pMyClient;
+//		   pMyClient = NULL;
+//	   }
+//	   UaPlatformLayer::cleanup();
+//	   exit(signum);
 }
 /*============================================================================
  * main
@@ -70,7 +74,7 @@ int main(int argc, char*argv[])
 			{"help",0,NULL,'h'},
 			{0, 0, 0,0}
 	};
-	int delta = 1000;
+    uint delta = 1000;
 //	int mean = 5; #default N 5 in samplesubscription.h
 
 	// loop over all of the options
@@ -102,8 +106,6 @@ int main(int argc, char*argv[])
 	printf("\n\n delta = %d, ", delta);
 //	printf("mean = %s, ", mean);
 
-    UaStatus status;
-
     // Initialize the UA Stack platform layer
     UaPlatformLayer::init();
 
@@ -111,13 +113,18 @@ int main(int argc, char*argv[])
     pMyClient = new SampleClient(delta);
 
     // Connect to OPC UA Server
-    status = pMyClient->connect();
+    status_run = pMyClient->connect();
 
     // Connect succeeded
-    if (status.isGood())
+    if (status_run.isGood())
     {
         // Read values one time
-        status = pMyClient->read();
+        while(!exit_flag)
+        {
+            status_run = pMyClient->read();
+            UaThread::msleep(delta);
+        }
+
 
 
         // Wait for user command.
@@ -142,7 +149,7 @@ int main(int argc, char*argv[])
 //        //getchar();
 
 //        // Disconnect from OPC UA Server
-//        status = pMyClient->disconnect();
+        pMyClient->disconnect();
     }
 
     // Close application
