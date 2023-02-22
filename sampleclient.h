@@ -30,7 +30,8 @@
 #include "uaclientsdk.h"
 #include <map>
 #include <string.h>
-#include <list>
+#include <vector>
+#include <numeric>
 #include <sqlite3.h>
 
 class SampleSubscription;
@@ -41,7 +42,7 @@ class SampleClient : public UaSessionCallback
 {
     UA_DISABLE_COPY(SampleClient);
 public:
-    SampleClient(int);
+    SampleClient(int,int,int);
     virtual ~SampleClient();
 
     // UaSessionCallback implementation ----------------------------------------------------
@@ -60,7 +61,9 @@ private:
     UaSession*          m_pSession;
     SampleSubscription* m_pSampleSubscription;
     int delta;
-    std::map<std::string,std::list<double>> slice_data;
+    int mean;
+    int ns;
+    std::map<std::string,std::vector<double>> slice_data;
     std::vector<std::string> kks_array;
     sqlite3 *db;
     void init_db();

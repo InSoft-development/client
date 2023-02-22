@@ -38,12 +38,16 @@
 #include <fstream>
 #include <string.h>
 
-SampleClient::SampleClient(int d)
+SampleClient::SampleClient(int d, int m, int n = 1)
 {
     m_pSession = new UaSession();
     db = NULL;
     delta = d;
+    mean = m;
+    ns = n;
     m_pSampleSubscription = new SampleSubscription(delta);
+
+    init_db();
 }
 
 SampleClient::~SampleClient()
@@ -88,7 +92,9 @@ void SampleClient::init_db()
     while (infile >> kks)
     {
         kks_array.push_back(kks);
+        slice_data[kks] = std::vector<double>();
     }
+
     /* Open database */
     char *zErrMsg = 0;
     int rc = sqlite3_open("data.sqlite", &db);
@@ -221,17 +227,15 @@ UaStatus SampleClient::disconnect()
 
 UaStatus SampleClient::read()
 {
+    static int iteration_count;
     UaStatus          result;
     ServiceSettings   serviceSettings;
     UaReadValueIds    nodeToRead;
     nodeToRead.create(1);
     UaDataValues      values;
     UaDiagnosticInfos diagnosticInfos;
-    int ns = 1;
-    std::fstream infile("kks.csv");
     int item_index = 0;
-    std::string kks;
-    while (infile >> kks)
+    for (auto kks : kks_array)
     {
 
         // Configure one node to read
@@ -253,7 +257,32 @@ UaStatus SampleClient::read()
         	// Read service succeded - check status of read value
         	if (OpcUa_IsGood(values[0].StatusCode))
         	{
-            		printf("%s : %s\n", UaNodeId(nodeToRead[item_index].NodeId).toXmlString().toUtf8(), UaVariant(values[0].Value).toString().toUtf8());
+                    UaVariant tempValue = values[0].Value;
+                    OpcUa_Double val;
+                    tempValue.toDouble(val);
+                    double value = val;
+                    slice_data[kks].push_back(value);
+                    printf("%s : %f\n", UaNodeId(nodeToRead[item_index].NodeId).toXmlString().toUtf8(), value);
+
+                    if (iteration_count == mean-1 )
+                    {
+                        std::string kks_string;
+                        std::string value_string;
+                        for (auto kks : kks_array)
+                        {
+                            kks_string += "\"" + kks + "\",";
+                            value_string += std::to_string(std::accumulate(slice_data[kks].begin(), slice_data[kks].end(), 0.0)/ slice_data[kks].size()) + ",";
+                        }
+                        kks_string += "\"timestamp\"";
+                        value_string += "CURRENT_TIMESTAMP";
+
+                        std::string sql = std::string("INSERT INTO synchro_data ( ") + kks_string + ") VALUES(" +
+                                value_string + ");";
+                        std::cout<< "\n SQL:\n" << sql<< "\n";
+                        iteration_count = 0;
+
+                    }
+
         	}	
         	else
         	{
@@ -267,16 +296,7 @@ UaStatus SampleClient::read()
 		break;
     	}
     }
-
-//    for row in global_data:
-//                row["timestamp"] = "\'" + str(t1) + "\'"
-//                execute_string1 = "INSERT INTO synchro_data ("
-//                execute_string2 = ") VALUES("
-//                for d in row.keys():
-//                    execute_string1 += "\"" + str(d) + "\","
-//                    execute_string2 += str(row[d]) + ","
-//                execute_string = execute_string1[:-1] + execute_string2[:-1] + ")"
-
+    iteration_count++;
     return result;
 }
 

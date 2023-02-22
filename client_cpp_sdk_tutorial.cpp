@@ -69,48 +69,55 @@ int main(int argc, char*argv[])
 
 	static struct option long_options[] =
 	{
-			{"delta", 1, NULL,'d'},
-//			{"mean", 1, NULL,'m'},
+            {"delta", 0, NULL,'d'},
+            {"mean", 0, NULL,'m'},
+            {"ns", 0, NULL,'n'},
 			{"help",0,NULL,'h'},
 			{0, 0, 0,0}
 	};
     uint delta = 1000;
-//	int mean = 5; #default N 5 in samplesubscription.h
+    int mean = 5;
+    int ns = 1;
 
 	// loop over all of the options
 	int ch;
-	while ((ch = getopt_long(argc, argv, "hd:", long_options, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "hd:m:n", long_options, NULL)) != -1)
 	{
 	    // check to see if a single character or long option came through
 	    switch (ch)
 	    {
 	    	 case 'h':
 	    		 printf("read data from OPC UA\noptions:\n\
---delta(-d) miliseconds between reading from OPC UA\n\
---help(-h) this info\n");
-//--mean(-e) count of averaging: 1 means we don't calculate average and send each result to DB, 5 - we calculate 5 results to one mean and send it to DB\n\
-
+--help(-h) this info\n\
+--delta(-d) miliseconds between reading from OPC UA, default 1000\n\
+--ns(-n) number of space (1 by default)\n\
+--mean(-e) count of averaging: 1 means we don't calculate average and send each result to DB, 5 - we calculate 5 results to one mean and send it to DB. default 5");
 	    		 return 0;
-	    		 break;
 	         case 'd':
-	             delta = atoi(optarg);
+                 delta = atoi(optarg);
 	             printf("delta %i, ", delta);
 	             break;
-//	         case 'm':
-//	             mean = optarg;
-//	             printf("mean %i, ", mean);
-//	             break;
+             case 'm':
+                 mean = atoi(optarg);
+                 printf("mean %i, ", mean);
+                 break;
+            case 'n':
+                ns = atoi(optarg);
+                printf("ns %i, ", ns);
+                break;
+
 	    }
 	}
 
 	printf("\n\n delta = %d, ", delta);
-//	printf("mean = %s, ", mean);
+    printf("mean = %d, ", mean);
+    printf("ns = %d, ", mean);
 
     // Initialize the UA Stack platform layer
     UaPlatformLayer::init();
 
     // Create instance of SampleClient
-    pMyClient = new SampleClient(delta);
+    pMyClient = new SampleClient(delta,mean,ns);
 
     // Connect to OPC UA Server
     status_run = pMyClient->connect();
