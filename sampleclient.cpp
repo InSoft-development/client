@@ -72,7 +72,10 @@ SampleClient::~SampleClient()
     }
 
     if (db)
+    {
+        std::cout<<"Close DB\n";
         sqlite3_close(db);
+    }
 }
 
 static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
@@ -103,9 +106,9 @@ void SampleClient::init_db()
     }
     /* Create SQL statement */
     std::string kks_string;
-    for (auto kks : kks_array)
+    for (auto k : kks_array)
     {
-        kks_string += kks;
+        kks_string += k;
         kks_string += "\" real, \"";
     }
     if (!kks_string.empty())
@@ -264,24 +267,7 @@ UaStatus SampleClient::read()
                     slice_data[kks].push_back(value);
                     printf("%s : %f\n", UaNodeId(nodeToRead[item_index].NodeId).toXmlString().toUtf8(), value);
 
-                    if (iteration_count == mean-1 )
-                    {
-                        std::string kks_string;
-                        std::string value_string;
-                        for (auto kks : kks_array)
-                        {
-                            kks_string += "\"" + kks + "\",";
-                            value_string += std::to_string(std::accumulate(slice_data[kks].begin(), slice_data[kks].end(), 0.0)/ slice_data[kks].size()) + ",";
-                        }
-                        kks_string += "\"timestamp\"";
-                        value_string += "CURRENT_TIMESTAMP";
 
-                        std::string sql = std::string("INSERT INTO synchro_data ( ") + kks_string + ") VALUES(" +
-                                value_string + ");";
-                        std::cout<< "\n SQL:\n" << sql<< "\n";
-                        iteration_count = 0;
-
-                    }
 
         	}	
         	else
@@ -296,7 +282,38 @@ UaStatus SampleClient::read()
 		break;
     	}
     }
-    iteration_count++;
+
+    if (iteration_count == mean-1 )
+    {
+        std::string kks_string;
+        std::string value_string;
+        for (auto k : kks_array)
+        {
+            kks_string += "\"" + k + "\",";
+            if (slice_data[k].size())
+                value_string += std::to_string(std::accumulate(slice_data[k].begin(), slice_data[k].end(), 0.0)/ slice_data[k].size()) + ",";
+            else
+                value_string += "null,";
+        }
+        kks_string += "\"timestamp\"";
+        value_string += "CURRENT_TIMESTAMP";
+
+        std::string sql = std::string("INSERT INTO synchro_data ( ") + kks_string + ") VALUES(" +
+                value_string + ");";
+        std::cout<< "\n SQL:\n" << sql<< "\n";
+        /* Execute SQL statement */
+        char *zErrMsg = NULL;
+        int rc = sqlite3_exec(db, sql.c_str(), callback, 0, &zErrMsg);
+        if( rc != SQLITE_OK ){
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+            sqlite3_free(zErrMsg);
+        }
+        iteration_count = 0;
+
+    }
+    else
+        iteration_count++;
+
     return result;
 }
 
@@ -311,7 +328,6 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
 
 
 	UaDiagnosticInfos             diagnosticInfos;
-	int ns = 1;
 
 	// Read the last 30 minutes
 	UaDateTime myTime;
