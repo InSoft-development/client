@@ -34,24 +34,28 @@
 UaStatus status_run;
 SampleClient* pMyClient;
 bool exit_flag = false;
+bool online = false;
 
 void signalHandler(int signum)
 {
 
 	   printf("Interrupt!");
-       exit_flag = true;
-//	   if (status_run.isGood())
-//	   {
-//           //pMyClient->unsubscribe();
-//		   pMyClient->disconnect();
-//	   }
-//	   if (pMyClient)
-//	   {
-//		   delete pMyClient;
-//		   pMyClient = NULL;
-//	   }
-//	   UaPlatformLayer::cleanup();
-//	   exit(signum);
+       if (online)
+           exit_flag = true;
+       else {
+           if (status_run.isGood())
+           {
+               //pMyClient->unsubscribe();
+               pMyClient->disconnect();
+           }
+           if (pMyClient)
+           {
+               delete pMyClient;
+               pMyClient = NULL;
+           }
+           UaPlatformLayer::cleanup();
+           exit(signum);
+       }
 }
 /*============================================================================
  * main
@@ -69,19 +73,32 @@ int main(int argc, char*argv[])
 
 	static struct option long_options[] =
 	{
+            {"online",0,NULL,'o'},
             {"delta", 0, NULL,'d'},
             {"mean", 0, NULL,'m'},
             {"ns", 0, NULL,'n'},
 			{"help",0,NULL,'h'},
+            {"begin", 0, NULL,'b'},
+            {"end", 0, NULL,'e'},
+            {"pause", 0, NULL,'p'},
+            {"timeout", 0, NULL,'t'},
+            {"read-bounds", 0, NULL,'r'},
+            {"no-bounds", 0, NULL,'n'},
+            {"rewrite", 0, NULL,'w'},
 			{0, 0, 0,0}
 	};
+
     uint delta = 1000;
     int mean = 5;
     int ns = 1;
-
+    std::string begin = "";
+    std::string end = "";
+    int pause = 50000, timeout = 100;
+    bool read_bounds = false;
+    bool rewrite = false;
 	// loop over all of the options
 	int ch;
-    while ((ch = getopt_long(argc, argv, "hd:m:n", long_options, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "hod:m:s:b:e:p:t:rnw", long_options, NULL)) != -1)
 	{
 	    // check to see if a single character or long option came through
 	    switch (ch)
@@ -89,35 +106,100 @@ int main(int argc, char*argv[])
 	    	 case 'h':
 	    		 printf("read data from OPC UA\noptions:\n\
 --help(-h) this info\n\
+--ns(-s) number of space (1 by default)\n\
+--online(-o) ONLINE MODE (default HISTORY MODE)\n\
+ONLINE:\n\
 --delta(-d) miliseconds between reading from OPC UA, default 1000\n\
---ns(-n) number of space (1 by default)\n\
---mean(-e) count of averaging: 1 means we don't calculate average and send each result to DB, 5 - we calculate 5 results to one mean and send it to DB. default 5");
-	    		 return 0;
-	         case 'd':
-                 delta = atoi(optarg);
-	             printf("delta %i, ", delta);
-	             break;
-             case 'm':
-                 mean = atoi(optarg);
-                 printf("mean %i, ", mean);
-                 break;
-            case 'n':
+--mean(-e) count of averaging: 1 means we don't calculate average and send each result to DB, 5 - we calculate 5 results to one mean and send it to DB. default 5\n\
+HISTORY MODE:\n\
+--begin(-b) <timestamp> in YYY-MM-DDTHH:MM:SS.MMMZ format (e.g. 2021-06-01T00:00:00.000Z\n\
+--end(-e) <timestramp>\n\
+--pause(-p) <miliseconds> pause between requests\n\
+--timeout(-t) <ms> maximum timeout, that we are waiting for response from server\n\
+--read-bounds(-r) if we need to read bounds\n\
+--no-bounds(-n) if we don\'t want read bounds (default)\n\
+                        ");
+                return 0;
+            case 'o':
+                online = true;
+                printf("online mode");
+                break;
+            case 'd':
+                delta = atoi(optarg);
+                printf("delta %i, ", delta);
+                break;
+            case 'm':
+                mean = atoi(optarg);
+                printf("mean %i, ", mean);
+                break;
+            case 's':
                 ns = atoi(optarg);
                 printf("ns %i, ", ns);
                 break;
+            case 'b':
+                begin = optarg;
+                printf("begin %s, ", begin.c_str());
+                break;
+            case 'e':
+                end = optarg;
+                printf("end %s, ", end.c_str());
+                break;
+            case 'p':
+                pause = atoi(optarg);
+                printf("pause %i, ", pause);
+                break;
+            case 't':
+                timeout = atoi(optarg);
+                printf("timeout %i, ", timeout);
+                break;
+            case 'r':
+                read_bounds = true;
+                printf("read bounds, ");
+                break;
+            case 'n':
+                read_bounds = false;
+                printf("don\'t read bounds, ");
+                break;
+            case 'w':
+                rewrite = true;
+                printf("rewrite db, ");
+                break;
+
 
 	    }
 	}
 
-	printf("\n\n delta = %d, ", delta);
-    printf("mean = %d, ", mean);
-    printf("ns = %d, ", mean);
+    if (online)
+    {
+        printf("ONLINE\n\n delta = %d, ", delta);
+        printf("mean = %d, ", mean);
+        printf("ns = %d, ", mean);
+    }
+    else
+    {
+        if (begin == "")
+        {
+            printf("begin time not pointed");
+            exit(1);
+        }
+        if (end == "")
+        {
+            printf("end time not pointed");
+            exit(1);
+        }
+        printf("HISTORY\n\n begin = %s, ", begin.c_str());
+        printf("end = %s, ", end.c_str());
+        printf("pause = %i, ", pause);
+        printf("timeout = %i, ", timeout);
+        printf("read bounds = %s \n", read_bounds?"true":"false");
+    }
+    printf("rewrite = %s \n", rewrite?"true":"false");
 
     // Initialize the UA Stack platform layer
     UaPlatformLayer::init();
 
     // Create instance of SampleClient
-    pMyClient = new SampleClient(delta,mean,ns);
+    pMyClient = new SampleClient(delta,mean,ns,rewrite);
 
     // Connect to OPC UA Server
     status_run = pMyClient->connect();
@@ -125,13 +207,20 @@ int main(int argc, char*argv[])
     // Connect succeeded
     if (status_run.isGood())
     {
-        // Read values one time
-        while(!exit_flag)
+        if (online)
         {
-            status_run = pMyClient->read();
-            UaThread::msleep(delta);
+            // Read values one time
+            while(!exit_flag)
+            {
+                status_run = pMyClient->read();
+                UaThread::msleep(delta);
+            }
         }
+        else
+        {
+            status_run = pMyClient->readHistory(begin.c_str(),end.c_str(),pause,timeout,read_bounds);
 
+        }
 
 
         // Wait for user command.
