@@ -130,6 +130,7 @@ if __name__ == '__main__':
                end_date.isoformat() + "\"")
         data_column = pd.read_sql(sql, conn_raw,parse_dates=['timestamp'])
         if len(data_column) == 0:
+            print("missing data!!")
             data_column = pd.DataFrame([{"timestamp": start_date, "value": 0},
                                         {"timestamp": end_date, "value": 0}])
         # print(len(data_column))
