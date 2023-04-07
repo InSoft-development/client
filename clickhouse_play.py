@@ -2,7 +2,7 @@ import signal
 import time
 from datetime import datetime
 import pandas as pd
-from clickhouse_driver import Client
+import clickhouse_connect
 
 terminate_flag = False
 
@@ -19,8 +19,11 @@ signal.signal(signal.SIGINT, handler_stop)
 t = datetime.now()
 print("data read")
 
-client = Client(user="default", password="asdf", host="10.23.0.177")
-slices = client.query_dataframe("SELECT * from slices where timestamp > \'2021-06-04 00:00:00\' order by timestamp")
+client = clickhouse_connect.get_client(host='10.23.0.177', username='default', password='asdf')
+
+slices = client.query_df("SELECT * from slices where timestamp > \'2021-06-04 00:00:00\' order by timestamp")
+slices.set_index('timestamp', inplace=True)
+print(slices)
 # def dateparse(x): return pd.to_datetime(x)  # datetime.datetime.strptime(x, '%Y-%m-%d %H:%M:%S.%f')
 # tp = pd.read_csv("slices.csv",
 #                  # nrows = 100,
@@ -39,27 +42,27 @@ slices = client.query_dataframe("SELECT * from slices where timestamp > \'2021-0
 # print(datetime.now() - t)
 # print(slices)
 
-client.execute("DROP TABLE IF EXISTS slices_play")
-sql = "CREATE TABLE slices_play (\"" + '\" Float64, \"'.join(slices.keys()) + "\" DateTime64) ENGINE = " \
+client.command("DROP TABLE IF EXISTS slices_play")
+sql = "CREATE TABLE slices_play (\"" + '\" Float64, \"'.join(slices.keys()) + "\" Float64, \"timestamp\" DateTime64) ENGINE = " \
       "MergeTree() PARTITION BY toYYYYMM(timestamp) ORDER BY (timestamp) PRIMARY KEY (timestamp)"
-# print(sql, "\n\n")
-client.execute(sql)
+print(sql, "\n\n")
+client.command(sql)
 while not terminate_flag:
     for index, row in slices.iterrows():
         t = datetime.now()
-        print(row["timestamp"])
         row["timestamp"] = t
         d = pd.DataFrame([row])
-        sql = 'INSERT INTO slices_play (*) VALUES'
-        client.insert_dataframe(sql, d, settings=dict(use_numpy=True))
+        #print(d)
+        client.insert_df('slices_play', d)
         #length = client.execute("SELECT count() from slices_play")[0][0]
         #print(length)
         if terminate_flag:
             break
         else:
             time.sleep(5)
+        slices_new = client.query_df("SELECT * from slices_play order by timestamp")
+        print(slices_new)
+
     print("from begin")
-length = client.execute("SELECT count() from slices_play")[0][0]
+length = client.query("SELECT count() from slices_play").first_item
 print("inserted", length, "rows")
-client.disconnect()
-print("disconnected")
