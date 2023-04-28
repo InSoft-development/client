@@ -38,7 +38,7 @@
 #include <fstream>
 #include <string.h>
 
-SampleClient::SampleClient(int d, int m, int n = 1, bool r=false)
+SampleClient::SampleClient(int d, int m, int n = 1, bool r=false, bool b=false)
 {
     m_pSession = new UaSession();
     rewrite = r;
@@ -46,6 +46,7 @@ SampleClient::SampleClient(int d, int m, int n = 1, bool r=false)
     delta = d;
     mean = m;
     ns = n;
+    read_bad = b;
     m_pSampleSubscription = new SampleSubscription(delta);
 
     init_db();
@@ -274,7 +275,7 @@ UaStatus SampleClient::read()
     	if (result.isGood())
     	{
         	// Read service succeded - check status of read value
-        	if (OpcUa_IsGood(values[0].StatusCode))
+            if (read_bad || OpcUa_IsGood(values[0].StatusCode))
         	{
                     UaVariant tempValue = values[0].Value;
                     OpcUa_Double val;
@@ -415,7 +416,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     				std::string sourceTS = UaDateTime(results[i].m_dataValues[j].SourceTimestamp).toString().toUtf8();
     				sourceTS.pop_back();
     				sourceTS[10] = ' ';
-    				if ( OpcUa_IsGood(results[i].m_dataValues[j].StatusCode) )
+                    if ( read_bad || OpcUa_IsGood(results[i].m_dataValues[j].StatusCode) )
     				{
     					UaVariant tempValue = results[i].m_dataValues[j].Value;
                         sql += std::string("INSERT INTO dynamic_data (id,t,val,status) VALUES (\"") +
@@ -502,7 +503,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     						std::string sourceTS = UaDateTime(results[i].m_dataValues[j].SourceTimestamp).toString().toUtf8();
 							sourceTS.pop_back();
 							sourceTS[10] = ' ';
-    						if ( OpcUa_IsGood(results[i].m_dataValues[j].StatusCode) )
+                            if ( read_bad || OpcUa_IsGood(results[i].m_dataValues[j].StatusCode) )
     						{
 
                                 UaVariant tempValue = results[i].m_dataValues[j].Value;

@@ -42,7 +42,7 @@ class SampleClient : public UaSessionCallback
 {
     UA_DISABLE_COPY(SampleClient);
 public:
-    SampleClient(int,int,int,bool);
+    SampleClient(int,int,int,bool,bool);
     virtual ~SampleClient();
 
     // UaSessionCallback implementation ----------------------------------------------------
@@ -61,6 +61,7 @@ private:
     UaSession*          m_pSession;
     SampleSubscription* m_pSampleSubscription;
     bool rewrite;
+    bool read_bad;
     int delta;
     int mean;
     int ns;

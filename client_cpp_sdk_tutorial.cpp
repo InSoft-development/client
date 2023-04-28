@@ -85,6 +85,8 @@ int main(int argc, char*argv[])
             {"read-bounds", 0, NULL,'r'},
             {"no-bounds", 0, NULL,'n'},
             {"rewrite", 0, NULL,'w'},
+            {"read-bad", 0, NULL,'x'},
+
 			{0, 0, 0,0}
 	};
 
@@ -96,9 +98,10 @@ int main(int argc, char*argv[])
     int pause = 50000, timeout = 100;
     bool read_bounds = false;
     bool rewrite = false;
+    bool read_bad = false;
 	// loop over all of the options
 	int ch;
-    while ((ch = getopt_long(argc, argv, "hod:m:s:b:e:p:t:rnw", long_options, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "hod:m:s:b:e:p:t:rnwx", long_options, NULL)) != -1)
 	{
 	    // check to see if a single character or long option came through
 	    switch (ch)
@@ -164,6 +167,10 @@ HISTORY MODE:\n\
                 rewrite = true;
                 printf("rewrite db, ");
                 break;
+            case 'x':
+                read_bad = true;
+                printf("read_bad, ");
+                break;
 
 
 	    }
@@ -199,7 +206,7 @@ HISTORY MODE:\n\
     UaPlatformLayer::init();
 
     // Create instance of SampleClient
-    pMyClient = new SampleClient(delta,mean,ns,rewrite);
+    pMyClient = new SampleClient(delta,mean,ns,rewrite,read_bad);
 
     // Connect to OPC UA Server
     status_run = pMyClient->connect();
