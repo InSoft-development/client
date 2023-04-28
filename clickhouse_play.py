@@ -43,13 +43,14 @@ print(slices)
 # print(slices)
 
 client.command("DROP TABLE IF EXISTS slices_play")
-sql = "CREATE TABLE slices_play (\"" + '\" Float64, \"'.join(slices.keys()) + "\" Float64, \"timestamp\" DateTime64) ENGINE = " \
+sql = "CREATE TABLE slices_play (\"" + '\" Float64, \"'.join(slices.keys()) + "\" Float64, \"timestamp\" DateTime64(3,'Europe/Moscow'), \"model_timestamp\" DateTime64(3,'Europe/Moscow')) ENGINE = " \
       "MergeTree() PARTITION BY toYYYYMM(timestamp) ORDER BY (timestamp) PRIMARY KEY (timestamp)"
 print(sql, "\n\n")
 client.command(sql)
 while not terminate_flag:
     for index, row in slices.iterrows():
-        t = datetime.now()
+        t = datetime.utcnow()
+        row["model_timestamp"]=index
         row["timestamp"] = t
         d = pd.DataFrame([row])
         #print(d)
@@ -60,7 +61,7 @@ while not terminate_flag:
             break
         else:
             time.sleep(5)
-        slices_new = client.query_df("SELECT * from slices_play order by timestamp")
+        slices_new = client.query_df("SELECT * from slices_play order by timestamp DESC LIMIT 1")
         print(slices_new)
 
     print("from begin")
