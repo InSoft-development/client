@@ -556,3 +556,55 @@ UaStatus SampleClient::unsubscribe()
 {
     return m_pSampleSubscription->deleteSubscription();
 }
+
+UaStatus SampleClient::browseInternal()//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
+{
+    UaStatus result;
+    ServiceSettings   serviceSettings;
+    UaReadValueIds    nodeToRead;
+    nodeToRead.create(1);
+    UaDataValues      values;
+    UaDiagnosticInfos diagnosticInfos;
+    int item_index = 0;
+    for (auto kks : kks_array)
+    {
+
+        // Configure one node to read
+        // We read the value of the ServerStatus -> CurrentTime
+        nodeToRead.resize(item_index+1);
+        nodeToRead[item_index].AttributeId = OpcUa_Attributes_Description;
+        UaNodeId test(UaString(kks.c_str()),ns);
+        test.copyTo(&nodeToRead[item_index].NodeId);
+        result = m_pSession->read(serviceSettings,
+                                  0,
+                                  OpcUa_TimestampsToReturn_Both,
+                                  nodeToRead,
+                                  values,
+                                  diagnosticInfos);
+
+
+        if (result.isGood())
+        {
+            // Read service succeded - check status of read value
+            if (read_bad || OpcUa_IsGood(values[0].StatusCode))
+            {
+                    UaVariant tempValue = values[0].Value;
+                    UaLocalizedText val;
+                    tempValue.toLocalizedText(val);
+                    printf("%s : %s\n", UaNodeId(nodeToRead[item_index].NodeId).toXmlString().toUtf8(), UaString(val.text()).toUtf8());
+            }
+            else
+            {
+                    printf("Read failed for %s with status %s\n", UaNodeId(nodeToRead[item_index].NodeId).toXmlString().toUtf8(),UaStatus(values[0].StatusCode).toString().toUtf8());
+            }
+        }
+    else
+        {
+            // Service call failed
+            printf("Read failed with status %s\n", result.toString().toUtf8());
+        break;
+        }
+    }
+
+    return result;
+}

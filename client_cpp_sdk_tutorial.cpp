@@ -74,6 +74,7 @@ int main(int argc, char*argv[])
 	static struct option long_options[] =
 	{
             {"online",0,NULL,'o'},
+            {"history",0,NULL,'i'},
             {"delta", 0, NULL,'d'},
             {"mean", 0, NULL,'m'},
             {"ns", 0, NULL,'n'},
@@ -86,22 +87,25 @@ int main(int argc, char*argv[])
             {"no-bounds", 0, NULL,'n'},
             {"rewrite", 0, NULL,'w'},
             {"read-bad", 0, NULL,'x'},
+            {"kks", 0, NULL,'k'},
 
 			{0, 0, 0,0}
 	};
 
     uint delta = 1000;
     int mean = 5;
-    int ns = 1;
+    unsigned short ns = 1;
     std::string begin = "";
     std::string end = "";
     int pause = 50000, timeout = 100;
     bool read_bounds = false;
     bool rewrite = false;
     bool read_bad = false;
+    bool kks_mode = false;
+    bool history_mode = true;
 	// loop over all of the options
 	int ch;
-    while ((ch = getopt_long(argc, argv, "hod:m:s:b:e:p:t:rnwx", long_options, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "hod:m:s:b:e:p:t:rnwxki", long_options, NULL)) != -1)
 	{
 	    // check to see if a single character or long option came through
 	    switch (ch)
@@ -110,7 +114,9 @@ int main(int argc, char*argv[])
 	    		 printf("read data from OPC UA\noptions:\n\
 --help(-h) this info\n\
 --ns(-s) number of space (1 by default)\n\
---online(-o) ONLINE MODE (default HISTORY MODE)\n\
+--kks(-k) kks browse mode \n\
+--online(-o) online mode \n\
+--history(-i) history mode (default)\n\
 ONLINE:\n\
 --delta(-d) miliseconds between reading from OPC UA, default 1000\n\
 --mean(-e) count of averaging: 1 means we don't calculate average and send each result to DB, 5 - we calculate 5 results to one mean and send it to DB. default 5\n\
@@ -125,6 +131,7 @@ HISTORY MODE:\n\
                 return 0;
             case 'o':
                 online = true;
+                history_mode = false;
                 printf("online mode");
                 break;
             case 'd':
@@ -171,7 +178,17 @@ HISTORY MODE:\n\
                 read_bad = true;
                 printf("read_bad, ");
                 break;
-
+            case 'k':
+                kks_mode = true;
+                online = false;
+                history_mode = false;
+                printf("read kks, ");
+                break;
+            case 'i':
+               history_mode = true;
+               online = false;
+               printf("read history, ");
+               break;
 
 	    }
 	}
@@ -180,9 +197,13 @@ HISTORY MODE:\n\
     {
         printf("ONLINE\n\n delta = %d, ", delta);
         printf("mean = %d, ", mean);
-        printf("ns = %d, ", mean);
+        printf("ns = %d, ", ns);
     }
-    else
+    else if (kks_mode)
+    {
+        printf("KKS\n\n ns = %d, ", ns);
+    }
+    else if (history_mode)
     {
         if (begin == "")
         {
@@ -223,10 +244,13 @@ HISTORY MODE:\n\
                 UaThread::msleep(delta);
             }
         }
-        else
+        else if (kks_mode)
+        {
+            status_run = pMyClient->browseInternal();
+        }
+        else if (history_mode)
         {
             status_run = pMyClient->readHistory(begin.c_str(),end.c_str(),pause,timeout,read_bounds);
-
         }
 
 

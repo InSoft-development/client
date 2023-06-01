@@ -56,6 +56,7 @@ public:
     UaStatus readHistory(const char*,const char*,int,int,bool);
     UaStatus subscribe();
     UaStatus unsubscribe();
+    UaStatus browseInternal();//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn);
 
 private:
     UaSession*          m_pSession;
@@ -64,7 +65,7 @@ private:
     bool read_bad;
     int delta;
     int mean;
-    int ns;
+    unsigned short ns;
     std::map<std::string,std::vector<double>> slice_data;
     std::vector<std::string> kks_array;
     sqlite3 *db;
