@@ -88,7 +88,7 @@ int main(int argc, char*argv[])
             {"rewrite", 0, NULL,'w'},
             {"read-bad", 0, NULL,'x'},
             {"kks", 0, NULL,'k'},
-
+            {"list", 0, NULL,'l'},
 			{0, 0, 0,0}
 	};
 
@@ -103,9 +103,10 @@ int main(int argc, char*argv[])
     bool read_bad = false;
     bool kks_mode = false;
     bool history_mode = true;
+    std::string kks = "";
 	// loop over all of the options
 	int ch;
-    while ((ch = getopt_long(argc, argv, "hod:m:s:b:e:p:t:rnwxki", long_options, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "hod:m:s:b:e:p:t:rnwxkil:", long_options, NULL)) != -1)
 	{
 	    // check to see if a single character or long option came through
 	    switch (ch)
@@ -115,6 +116,8 @@ int main(int argc, char*argv[])
 --help(-h) this info\n\
 --ns(-s) number of space (1 by default)\n\
 --kks(-k) kks browse mode \n\
+--full-list(-f) list all existing kks tags \n\
+--list (-l) <id> list tags from tree, begin with NodeId id \n\
 --online(-o) online mode \n\
 --history(-i) history mode (default)\n\
 ONLINE:\n\
@@ -184,6 +187,10 @@ HISTORY MODE:\n\
                 history_mode = false;
                 printf("read kks, ");
                 break;
+            case 'l':
+                kks = optarg;
+                printf("list, ");
+                break;
             case 'i':
                history_mode = true;
                online = false;
@@ -202,6 +209,8 @@ HISTORY MODE:\n\
     else if (kks_mode)
     {
         printf("KKS\n\n ns = %d, ", ns);
+        if (kks != "")
+            printf("list of kks from id= %s, ", kks.c_str());
     }
     else if (history_mode)
     {
@@ -246,7 +255,10 @@ HISTORY MODE:\n\
         }
         else if (kks_mode)
         {
-            status_run = pMyClient->browseInternal();
+            if (kks != "")
+                status_run = pMyClient->browseSimple(kks.c_str());
+            else
+                status_run = pMyClient->returnNames();
         }
         else if (history_mode)
         {

@@ -557,7 +557,102 @@ UaStatus SampleClient::unsubscribe()
     return m_pSampleSubscription->deleteSubscription();
 }
 
-UaStatus SampleClient::browseInternal()//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
+UaStatus SampleClient::browseSimple(const char* kks)//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
+{
+    UaStatus result;
+    UaNodeId nodeToBrowse;
+    nodeToBrowse = UaNodeId(UaString(kks),ns);
+    result = browseInternal(nodeToBrowse, 0);
+    return result;
+}
+
+UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
+{
+    UaStatus result;
+    ServiceSettings serviceSettings;
+    BrowseContext browseContext;
+    UaByteString continuationPoint;
+    UaReferenceDescriptions referenceDescriptions;
+    // configure browseContext
+    browseContext.browseDirection = OpcUa_BrowseDirection_Forward;
+    browseContext.referenceTypeId = OpcUaId_HierarchicalReferences;
+    browseContext.includeSubtype = OpcUa_True;
+    browseContext.maxReferencesToReturn = maxReferencesToReturn;
+    printf("\nBrowsing from Node %s...\n", nodeToBrowse.toXmlString().toUtf8());
+    result = m_pSession->browse(
+        serviceSettings,
+        nodeToBrowse,
+        browseContext,
+        continuationPoint,
+        referenceDescriptions);
+    if (result.isGood())
+    {
+        // print results
+        printBrowseResults(referenceDescriptions);
+//        for (OpcUa_UInt32 i=0; i<referenceDescriptions.length(); i++)
+//        {
+//            browseInternal(referenceDescriptions[i].NodeId.NodeId,0);
+//        }
+        // continue browsing
+        while (continuationPoint.length() > 0)
+        {
+            printf("\nContinuationPoint is set. BrowseNext...\n");
+            // browse next
+            result = m_pSession->browseNext(
+                serviceSettings,
+                OpcUa_False,
+                continuationPoint,
+                referenceDescriptions);
+            if (result.isGood())
+            {
+                // print results
+                printBrowseResults(referenceDescriptions);
+//                for (OpcUa_UInt32 i=0; i<referenceDescriptions.length(); i++)
+//                {
+//                    browseInternal(referenceDescriptions[i].NodeId.NodeId,0);
+//                }
+            }
+            else
+            {
+                // Service call failed
+                printf("BrowseNext failed with status %s\n", result.toString().toUtf8());
+            }
+        }
+    }
+    else
+    {
+        // Service call failed
+        printf("Browse failed with status %s\n", result.toString().toUtf8());
+    }
+    return result;
+}
+
+void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDescriptions)
+{
+    OpcUa_UInt32 i;
+    for (i=0; i<referenceDescriptions.length(); i++)
+    {
+        printf("node: ");
+        UaNodeId referenceTypeId(referenceDescriptions[i].ReferenceTypeId);
+        printf("[Ref=%s] ", referenceTypeId.toString().toUtf8() );
+        UaQualifiedName browseName(referenceDescriptions[i].BrowseName);
+        printf("%s ( ", browseName.toString().toUtf8() );
+        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_Object) printf("Object ");
+        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_Variable) printf("Variable ");
+        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_Method) printf("Method ");
+        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_ObjectType) printf("ObjectType ");
+        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_VariableType) printf("VariableType ");
+        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_ReferenceType) printf("ReferenceType ");
+        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_DataType) printf("DataType ");
+        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_View) printf("View ");
+        UaNodeId nodeId(referenceDescriptions[i].NodeId.NodeId);
+        printf("[NodeIdString=%s] ", nodeId.toFullString().toUtf8() );
+        printf("[NodeId=%d] ", nodeId. identifierNumeric());
+        printf(")\n");
+    }
+}
+
+UaStatus SampleClient::returnNames()//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
 {
     UaStatus result;
     ServiceSettings   serviceSettings;

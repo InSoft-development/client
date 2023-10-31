@@ -20,3 +20,11 @@ historical access:
 online opc ua data access:
 
 ./client_lesson02 -o
+
+kks browsing:
+
+./client_lesson02 -k -l 00_Блок_2.01_Сочинская_ТЭС_блок_2.20BAC10GS001-MR
+
+kks descriptions (using kks.csv):
+
+./client_lesson02 -k

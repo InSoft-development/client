@@ -56,7 +56,11 @@ public:
     UaStatus readHistory(const char*,const char*,int,int,bool);
     UaStatus subscribe();
     UaStatus unsubscribe();
-    UaStatus browseInternal();//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn);
+    UaStatus returnNames();
+    UaStatus browseSimple(const char*);
+    UaStatus browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn);
+    void printBrowseResults(const UaReferenceDescriptions& referenceDescriptions);
+
 
 private:
     UaSession*          m_pSession;
