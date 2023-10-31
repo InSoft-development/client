@@ -567,7 +567,7 @@ UaStatus SampleClient::browseSimple(std::string kks)//const UaNodeId& nodeToBrow
         nodeToBrowse = UaNodeId(OpcUaId_RootFolder);
         recursive = true;
     }
-    if (kks == "begin")
+    else if (kks == "begin")
         nodeToBrowse = UaNodeId(OpcUaId_ObjectsFolder);
     else
         nodeToBrowse = UaNodeId(UaString(kks.c_str()),ns);
