@@ -116,8 +116,9 @@ int main(int argc, char*argv[])
 --help(-h) this info\n\
 --ns(-s) number of space (1 by default)\n\
 --kks(-k) kks browse mode \n\
---full-list(-f) list all existing kks tags \n\
---list (-l) <id> list tags from tree, begin with NodeId id \n\
+--list (-l) <id> list tags from <id> subobjects, strings, values, variables etc. \
+                 all - it would be all tags, by recursive (huge amount! may fail), \
+                 begin - it would start from begin of object tree\n\
 --online(-o) online mode \n\
 --history(-i) history mode (default)\n\
 ONLINE:\n\

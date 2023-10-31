@@ -57,8 +57,8 @@ public:
     UaStatus subscribe();
     UaStatus unsubscribe();
     UaStatus returnNames();
-    UaStatus browseSimple(const char*);
-    UaStatus browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn);
+    UaStatus browseSimple(std::string);
+    UaStatus browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn, bool recursive);
     void printBrowseResults(const UaReferenceDescriptions& referenceDescriptions);
 
 
