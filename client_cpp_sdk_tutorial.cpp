@@ -89,7 +89,8 @@ int main(int argc, char*argv[])
             {"read-bad", 0, NULL,'x'},
             {"kks", 0, NULL,'k'},
             {"list", 0, NULL,'l'},
-			{0, 0, 0,0}
+            {"recursive", 0, NULL,'c'},
+            {0, 0, 0, 0}
 	};
 
     uint delta = 1000;
@@ -104,9 +105,10 @@ int main(int argc, char*argv[])
     bool kks_mode = false;
     bool history_mode = true;
     std::string kks = "";
+    bool recursive = false;
 	// loop over all of the options
 	int ch;
-    while ((ch = getopt_long(argc, argv, "hod:m:s:b:e:p:t:rnwxkil:", long_options, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "hod:m:s:b:e:p:t:rnwxkil:c", long_options, NULL)) != -1)
 	{
 	    // check to see if a single character or long option came through
 	    switch (ch)
@@ -116,9 +118,10 @@ int main(int argc, char*argv[])
 --help(-h) this info\n\
 --ns(-s) number of space (1 by default)\n\
 --kks(-k) kks browse mode \n\
---list (-l) <id> list tags from <id> subobjects, strings, values, variables etc. \
-                 all - it would be all tags, by recursive (huge amount! may fail), \
-                 begin - it would start from begin of object tree\n\
+--list (-l) <id> list subobjects from <id> object, strings, values, variables etc. \
+                 all - from root folder, \
+                 begin - from begin of object folder\n\
+--recursive (-c) read tags recursively from all objects subobjects\n\
 --online(-o) online mode \n\
 --history(-i) history mode (default)\n\
 ONLINE:\n\
@@ -192,6 +195,10 @@ HISTORY MODE:\n\
                 kks = optarg;
                 printf("list, ");
                 break;
+            case 'c':
+                recursive = true;
+                printf("recursive, ");
+                break;
             case 'i':
                history_mode = true;
                online = false;
@@ -211,7 +218,14 @@ HISTORY MODE:\n\
     {
         printf("KKS\n\n ns = %d, ", ns);
         if (kks != "")
-            printf("list of kks from id= %s, ", kks.c_str());
+            if (recursive)
+                printf("list of kks recursively from id= %s, ", kks.c_str());
+            else
+                printf("list of subobjects from id= %s, ", kks.c_str());
+        else {
+            printf("show kks descriptions, ");
+        }
+
     }
     else if (history_mode)
     {
@@ -257,7 +271,7 @@ HISTORY MODE:\n\
         else if (kks_mode)
         {
             if (kks != "")
-                status_run = pMyClient->browseSimple(kks.c_str());
+                status_run = pMyClient->browseSimple(kks.c_str(),recursive);
             else
                 status_run = pMyClient->returnNames();
         }

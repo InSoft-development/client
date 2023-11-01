@@ -557,15 +557,13 @@ UaStatus SampleClient::unsubscribe()
     return m_pSampleSubscription->deleteSubscription();
 }
 
-UaStatus SampleClient::browseSimple(std::string kks)//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
+UaStatus SampleClient::browseSimple(std::string kks, bool recursive)//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
 {
     UaStatus result;
     UaNodeId nodeToBrowse;
-    bool recursive = false;
     if (kks == "all")
     {
         nodeToBrowse = UaNodeId(OpcUaId_RootFolder);
-        recursive = true;
     }
     else if (kks == "begin")
         nodeToBrowse = UaNodeId(OpcUaId_ObjectsFolder);
