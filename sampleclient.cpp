@@ -587,7 +587,7 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
     browseContext.referenceTypeId = OpcUaId_HierarchicalReferences;
     browseContext.includeSubtype = OpcUa_True;
     browseContext.maxReferencesToReturn = maxReferencesToReturn;
-    printf("\nBrowsing from Node %s...\n", nodeToBrowse.toXmlString().toUtf8());
+//    printf("\nBrowsing from Node %s...\n", nodeToBrowse.toXmlString().toUtf8());
     result = m_pSession->browse(
         serviceSettings,
         nodeToBrowse,
@@ -643,24 +643,8 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
     OpcUa_UInt32 i;
     for (i=0; i<referenceDescriptions.length(); i++)
     {
-        //printf("node: ");
-        UaNodeId referenceTypeId(referenceDescriptions[i].ReferenceTypeId);
-        //printf("[Ref=%s] ", referenceTypeId.toString().toUtf8() );
-        UaQualifiedName browseName(referenceDescriptions[i].BrowseName);
-        printf("%s\n", browseName.toString().toUtf8() );
-//        printf("%s ( ", browseName.toString().toUtf8() );
-//        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_Object) printf("Object ");
-//        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_Variable) printf("Variable ");
-//        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_Method) printf("Method ");
-//        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_ObjectType) printf("ObjectType ");
-//        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_VariableType) printf("VariableType ");
-//        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_ReferenceType) printf("ReferenceType ");
-//        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_DataType) printf("DataType ");
-//        if (referenceDescriptions[i].NodeClass & OpcUa_NodeClass_View) printf("View ");
-//        UaNodeId nodeId(referenceDescriptions[i].NodeId.NodeId);
-//        printf("[NodeIdString=%s] ", nodeId.toFullString().toUtf8() );
-//        printf("[NodeId=%d] ", nodeId. identifierNumeric());
-//        printf(")\n");
+        UaNodeId nodeId(referenceDescriptions[i].NodeId.NodeId);
+        printf("%s\n", nodeId.toString().toUtf8() );
     }
 }
 
