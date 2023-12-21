@@ -9,6 +9,44 @@ clickhouse_fill.py - send data from slices.csv to clickhouse
 clickhouse_play.py - play data from table slices to table slices_play, as an emulation of working stand, accelerated 60 times (each 5 seconds instead 5 minutes)
 last_row.py - example of receiving data from clickhouse in online mode
 
+options:
+
+--help(-h) this info
+
+--ns(-s) number of space (1 by default)
+
+--kks(-k) kks browse mode 
+
+--list (-l) <id> list subobjects from <id> object, strings, values, variables etc. all - from root folder, begin - from begin of object folder
+
+--recursive (-c) read tags recursively from all objects subobjects
+
+--online(-o) online mode 
+
+--history(-i) history mode (default)
+
+ONLINE:
+
+--delta(-d) miliseconds between reading from OPC UA, default 1000
+
+--mean(-e) count of averaging: 1 means we don't calculate average and send each result to DB, 5 - we calculate 5 results to one mean and send it to DB. default 5
+
+HISTORY MODE:
+
+--begin(-b) <timestamp> in YYY-MM-DDTHH:MM:SS.MMMZ format (e.g. 2021-06-01T00:00:00.000Z
+
+--end(-e) <timestramp>
+
+--pause(-p) <miliseconds> pause between requests
+
+--timeout(-t) <ms> maximum timeout, that we are waiting for response from server
+
+--read-bounds(-r) if we need to read bounds
+
+--no-bounds(-n) if we don't want read bounds (default)
+
+--read-bad(-x) read also bad values (default false)
+
 examples:
 
 historical access:
