@@ -19,7 +19,7 @@ signal.signal(signal.SIGINT, handler_stop)
 t = datetime.now()
 print("data read")
 
-client = clickhouse_connect.get_client(host='10.23.0.177', username='default', password='asdf')
+client = clickhouse_connect.get_client(host='localhost', username='default', password='')
 
 slices = client.query_df("SELECT * from slices where timestamp > \'2021-06-04 00:00:00\' order by timestamp")
 slices.set_index('timestamp', inplace=True)
