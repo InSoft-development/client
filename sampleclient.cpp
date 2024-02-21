@@ -694,11 +694,12 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
 
 UaStatus SampleClient::returnNames()//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
 {
-    UaStatus result;
+    UaStatus result, result_type;
     ServiceSettings   serviceSettings;
-    UaReadValueIds    nodeToRead;
+    UaReadValueIds    nodeToRead,nodeToReadType;
     nodeToRead.create(1);
-    UaDataValues      values;
+    nodeToReadType.create(1);
+    UaDataValues      values, values_type,values1;
     UaDiagnosticInfos diagnosticInfos;
     for (auto kks : kks_array)
     {
@@ -713,17 +714,45 @@ UaStatus SampleClient::returnNames()//const UaNodeId& nodeToBrowse, OpcUa_UInt32
                                   nodeToRead,
                                   values,
                                   diagnosticInfos);
+        //OpcUa_Attributes_DataType
+        nodeToRead[0].AttributeId = OpcUa_Attributes_DataType;
+        UaNodeId test_type(UaString(kks.c_str()),ns);
+        test_type.copyTo(&nodeToRead[0].NodeId);
+        result_type = m_pSession->read(serviceSettings,
+                                  0,
+                                  OpcUa_TimestampsToReturn_Both,
+                                  nodeToRead,
+                                  values_type,
+                                  diagnosticInfos);
 
 
-        if (result.isGood())
+        if (result.isGood() and result_type.isGood())
         {
             // Read service succeded - check status of read value
-            if (read_bad || OpcUa_IsGood(values[0].StatusCode))
+            if (read_bad || (OpcUa_IsGood(values[0].StatusCode) && OpcUa_IsGood(values_type[0].StatusCode)))
             {
                     UaVariant tempValue = values[0].Value;
                     UaLocalizedText val;
                     tempValue.toLocalizedText(val);
-                    printf("%s : %s\n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(), UaString(val.text()).toUtf8());
+
+                    UaVariant tempValue_type = values_type[0].Value;
+                    UaNodeId val_type;
+                    tempValue_type.toNodeId(val_type);
+
+                    nodeToReadType[0].AttributeId = OpcUa_Attributes_DisplayName;
+                    val_type.copyTo(&nodeToReadType[0].NodeId);
+                    result = m_pSession->read(serviceSettings,
+                                              0,
+                                              OpcUa_TimestampsToReturn_Both,
+                                              nodeToReadType,
+                                              values1,
+                                              diagnosticInfos);
+                    UaVariant tempValue1 = values1[0].Value;
+                    UaLocalizedText val1;
+                    tempValue1.toLocalizedText(val1);
+
+                    //printf("%s : %s : %s\n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(), UaString(val.text()).toUtf8(), val_type.toString().toUtf8());
+                    printf("%s : %s \n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(), UaString(val1.text()).toUtf8());
             }
             else
             {
