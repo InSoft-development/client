@@ -126,14 +126,15 @@ int main(int argc, char*argv[])
 --history(-i) history mode (default)\n\
 ONLINE:\n\
 --delta(-d) miliseconds between reading from OPC UA, default 1000\n\
---mean(-e) count of averaging: 1 means we don't calculate average and send each result to DB, 5 - we calculate 5 results to one mean and send it to DB. default 5\n\
+--mean(-m) count of averaging: 1 means we don't calculate average and send each slice to DB, 5 - we calculate 5 slices to one mean and send it to DB. default 5\n\
 HISTORY MODE:\n\
---begin(-b) <timestamp> in YYY-MM-DDTHH:MM:SS.MMMZ format (e.g. 2021-06-01T00:00:00.000Z\n\
+--begin(-b) <timestamp> in YYYY-MM-DDTHH:MM:SS.MMMZ format (e.g. 2021-06-01T00:00:00.000Z\n\
 --end(-e) <timestramp>\n\
 --pause(-p) <miliseconds> pause between requests\n\
 --timeout(-t) <ms> maximum timeout, that we are waiting for response from server\n\
 --read-bounds(-r) if we need to read bounds\n\
 --no-bounds(-n) if we don\'t want read bounds (default)\n\
+--rewrite(-w) rewrite db\n\
 --read-bad(-x) read also bad values (default false)\n");
                 return 0;
             case 'o':
