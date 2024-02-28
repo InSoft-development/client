@@ -752,7 +752,7 @@ UaStatus SampleClient::returnNames()//const UaNodeId& nodeToBrowse, OpcUa_UInt32
                     UaLocalizedText val1;
                     tempValue1.toLocalizedText(val1);
 
-                    printf("%s : %s : %s\n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(), UaString(val1.text()).toUtf8(), UaString(val.text()).toUtf8());
+                    printf("%s;%s;%s\n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(), UaString(val1.text()).toUtf8(), UaString(val.text()).toUtf8());
                     //printf("%s : %s \n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(), UaString(val1.text()).toUtf8());
             }
             else
