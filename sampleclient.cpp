@@ -565,22 +565,24 @@ UaStatus SampleClient::browseSimple(std::string kks, bool recursive)//const UaNo
     {
         nodeToBrowse = UaNodeId(OpcUaId_RootFolder);
     }
-    else if (kks == "begin")
+    else if (kks == "begin" or kks == "")
         nodeToBrowse = UaNodeId(OpcUaId_ObjectsFolder);
     else
         nodeToBrowse = UaNodeId(UaString(kks.c_str()),ns);
+    kks_fstream.open("kks.csv");
     result = browseInternal(nodeToBrowse, 0, recursive);
+    kks_fstream.close();
     return result;
 }
 
 UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn,bool recursive)
 {
+
     UaStatus result;
     ServiceSettings serviceSettings;
     BrowseContext browseContext;
     UaByteString continuationPoint;
     UaReferenceDescriptions referenceDescriptions;
-    std::ofstream kks("kks.csv");
     // configure browseContext
     browseContext.browseDirection = OpcUa_BrowseDirection_Forward;
     browseContext.referenceTypeId = OpcUaId_HierarchicalReferences;
@@ -596,7 +598,7 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
     if (result.isGood())
     {
         // print results
-        printBrowseResults(referenceDescriptions,&kks);
+        printBrowseResults(referenceDescriptions);
         if (recursive)
             for (OpcUa_UInt32 i=0; i<referenceDescriptions.length(); i++)
             {
@@ -615,7 +617,7 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
             if (result.isGood())
             {
                 // print results
-                printBrowseResults(referenceDescriptions,&kks);
+                printBrowseResults(referenceDescriptions);
                 if (recursive)
                     for (OpcUa_UInt32 i=0; i<referenceDescriptions.length(); i++)
                     {
@@ -634,10 +636,12 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
         // Service call failed
         printf("Browse failed with status %s\n", result.toString().toUtf8());
     }
+
     return result;
+
 }
 
-void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDescriptions, std::ofstream* kks)
+void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDescriptions)
 {
 
     UaStatus result;
@@ -651,63 +655,42 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
     OpcUa_UInt32 i;
     for (i=0; i<referenceDescriptions.length(); i++)
     {
+        std::string kks_name, type="", description="";
         nodeToRead.resize(1);
         UaNodeId nodeId(referenceDescriptions[i].NodeId.NodeId);
-        *kks<<nodeId.toString().toUtf8()<<"\n";
+        //std::cout<<nodeId.toString().toUtf8()<<"\n";
 
-//        nodeToRead[0].AttributeId = OpcUa_Attributes_Description;
-//        UaNodeId test(UaString(nodeId.toString().toUtf8()),ns);
-//        test.copyTo(&nodeToRead[0].NodeId);
-//        nodeId.copyTo(&nodeToRead[0].NodeId);
-//        result = m_pSession->read(serviceSettings,
-//                                  0,
-//                                  OpcUa_TimestampsToReturn_Both,
-//                                  nodeToRead,
-//                                  values,
-//                                  diagnosticInfos);
-
-
-//        if (result.isGood())
-//        {
-//            // Read service succeded - check status of read value
-//            if (read_bad || OpcUa_IsGood(values[0].StatusCode))
-//            {
-//                    UaVariant tempValue = values[0].Value;
-//                    UaLocalizedText val;
-//                    tempValue.toLocalizedText(val);
-//                    printf("%s;%s\n", nodeId.toString().toUtf8(), UaString(val.text()).toUtf8());
-//            }
-//            else
-//            {
-//                    printf("%s\n", nodeId.toString().toUtf8() );
-//                    //printf("Read failed for %s with status %s\n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(),UaStatus(values[0].StatusCode).toString().toUtf8());
-//            }
-//        }
-//        else
-//        {
-//            // Service call failed
-//            printf("Read failed with status %s\n", result.toString().toUtf8());
-//        break;
-//        }
-
-    }
-}
-
-UaStatus SampleClient::returnNames()//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
-{
-    UaStatus result, result_type;
-    ServiceSettings   serviceSettings;
-    UaReadValueIds    nodeToRead,nodeToReadType;
-    nodeToRead.create(1);
-    nodeToReadType.create(1);
-    UaDataValues      values, values_type,values1;
-    UaDiagnosticInfos diagnosticInfos;
-    for (auto kks : kks_array)
-    {
-
-        //nodeToRead.resize(1);
         nodeToRead[0].AttributeId = OpcUa_Attributes_Description;
-        UaNodeId test(UaString(kks.c_str()),ns);
+        UaNodeId test(UaString(nodeId.toString().toUtf8()),ns);
+        test.copyTo(&nodeToRead[0].NodeId);
+        nodeId.copyTo(&nodeToRead[0].NodeId);
+        result = m_pSession->read(serviceSettings,
+                                  0,
+                                  OpcUa_TimestampsToReturn_Both,
+                                  nodeToRead,
+                                  values,
+                                  diagnosticInfos);
+
+
+        if (result.isGood())
+        {
+            if (read_bad || OpcUa_IsGood(values[0].StatusCode))
+            {
+                    UaVariant tempValue = values[0].Value;
+                    UaLocalizedText val;
+                    tempValue.toLocalizedText(val);
+                    description  = UaString(val.text()).toUtf8();
+            }
+
+        }
+        else
+        {
+            // Service call failed
+            printf("read description for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
+        }
+
+        nodeToRead[0].AttributeId = OpcUa_Attributes_DataType;
+        UaNodeId test_type(UaString(nodeId.toString().toUtf8()),ns);
         test.copyTo(&nodeToRead[0].NodeId);
         result = m_pSession->read(serviceSettings,
                                   0,
@@ -715,58 +698,126 @@ UaStatus SampleClient::returnNames()//const UaNodeId& nodeToBrowse, OpcUa_UInt32
                                   nodeToRead,
                                   values,
                                   diagnosticInfos);
-        //OpcUa_Attributes_DataType
-        nodeToRead[0].AttributeId = OpcUa_Attributes_DataType;
-        UaNodeId test_type(UaString(kks.c_str()),ns);
-        test_type.copyTo(&nodeToRead[0].NodeId);
-        result_type = m_pSession->read(serviceSettings,
-                                  0,
-                                  OpcUa_TimestampsToReturn_Both,
-                                  nodeToRead,
-                                  values_type,
-                                  diagnosticInfos);
 
-
-        if (result.isGood() and result_type.isGood())
+        if (result.isGood())
         {
-            // Read service succeded - check status of read value
-            if (read_bad || (OpcUa_IsGood(values[0].StatusCode) && OpcUa_IsGood(values_type[0].StatusCode)))
+            if (read_bad || OpcUa_IsGood(values[0].StatusCode))
             {
-                    UaVariant tempValue = values[0].Value;
-                    UaLocalizedText val;
-                    tempValue.toLocalizedText(val);
+                UaVariant tempValue = values[0].Value;
+                UaNodeId val;
+                tempValue.toNodeId(val);
+                nodeToRead[0].AttributeId = OpcUa_Attributes_DisplayName;
+                val.copyTo(&nodeToRead[0].NodeId);
+                result = m_pSession->read(serviceSettings,
+                                          0,
+                                          OpcUa_TimestampsToReturn_Both,
+                                          nodeToRead,
+                                          values,
+                                          diagnosticInfos);
+                if (result.isGood())
+                {
+                    if (read_bad || OpcUa_IsGood(values[0].StatusCode))
+                    {
+                        UaVariant tempValue1 = values[0].Value;
+                        UaLocalizedText val_type;
+                        tempValue1.toLocalizedText(val_type);
 
-                    UaVariant tempValue_type = values_type[0].Value;
-                    UaNodeId val_type;
-                    tempValue_type.toNodeId(val_type);
+                        type = UaString(val_type.text()).toUtf8();
+                    }
+                }
+                else
+                {
+                    // Service call failed
+                    printf("read data type disaplay name for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
+                }
 
-                    nodeToReadType[0].AttributeId = OpcUa_Attributes_DisplayName;
-                    val_type.copyTo(&nodeToReadType[0].NodeId);
-                    result = m_pSession->read(serviceSettings,
-                                              0,
-                                              OpcUa_TimestampsToReturn_Both,
-                                              nodeToReadType,
-                                              values1,
-                                              diagnosticInfos);
-                    UaVariant tempValue1 = values1[0].Value;
-                    UaLocalizedText val1;
-                    tempValue1.toLocalizedText(val1);
-
-                    printf("%s;%s;%s\n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(), UaString(val1.text()).toUtf8(), UaString(val.text()).toUtf8());
-                    //printf("%s : %s \n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(), UaString(val1.text()).toUtf8());
-            }
-            else
-            {
-                    printf("Read failed for %s with status %s\n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(),UaStatus(values[0].StatusCode).toString().toUtf8());
             }
         }
-    else
+        else
         {
             // Service call failed
-            printf("Read failed with status %s\n", result.toString().toUtf8());
-        break;
+            printf("read data type for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
         }
-    }
 
-    return result;
+        kks_fstream<<nodeId.toString().toUtf8()<<";"<<type<<";\""<< description<<"\"\n";
+
+    }
 }
+
+//UaStatus SampleClient::returnNames()//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
+//{
+//    UaStatus result, result_type;
+//    ServiceSettings   serviceSettings;
+//    UaReadValueIds    nodeToRead,nodeToReadType;
+//    nodeToRead.create(1);
+//    nodeToReadType.create(1);
+//    UaDataValues      values, values_type,values1;
+//    UaDiagnosticInfos diagnosticInfos;
+//    for (auto kks : kks_array)
+//    {
+
+//        //nodeToRead.resize(1);
+//        nodeToRead[0].AttributeId = OpcUa_Attributes_Description;
+//        UaNodeId test(UaString(kks.c_str()),ns);
+//        test.copyTo(&nodeToRead[0].NodeId);
+//        result = m_pSession->read(serviceSettings,
+//                                  0,
+//                                  OpcUa_TimestampsToReturn_Both,
+//                                  nodeToRead,
+//                                  values,
+//                                  diagnosticInfos);
+//        //OpcUa_Attributes_DataType
+//        nodeToRead[0].AttributeId = OpcUa_Attributes_DataType;
+//        UaNodeId test_type(UaString(kks.c_str()),ns);
+//        test_type.copyTo(&nodeToRead[0].NodeId);
+//        result_type = m_pSession->read(serviceSettings,
+//                                  0,
+//                                  OpcUa_TimestampsToReturn_Both,
+//                                  nodeToRead,
+//                                  values_type,
+//                                  diagnosticInfos);
+
+
+//        if (result.isGood() and result_type.isGood())
+//        {
+//            // Read service succeded - check status of read value
+//            if (read_bad || (OpcUa_IsGood(values[0].StatusCode) && OpcUa_IsGood(values_type[0].StatusCode)))
+//            {
+//                    UaVariant tempValue = values[0].Value;
+//                    UaLocalizedText val;
+//                    tempValue.toLocalizedText(val);
+
+//                    UaVariant tempValue_type = values_type[0].Value;
+//                    UaNodeId val_type;
+//                    tempValue_type.toNodeId(val_type);
+
+//                    nodeToReadType[0].AttributeId = OpcUa_Attributes_DisplayName;
+//                    val_type.copyTo(&nodeToReadType[0].NodeId);
+//                    result = m_pSession->read(serviceSettings,
+//                                              0,
+//                                              OpcUa_TimestampsToReturn_Both,
+//                                              nodeToReadType,
+//                                              values1,
+//                                              diagnosticInfos);
+//                    UaVariant tempValue1 = values1[0].Value;
+//                    UaLocalizedText val1;
+//                    tempValue1.toLocalizedText(val1);
+
+//                    printf("%s;%s;%s\n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(), UaString(val1.text()).toUtf8(), UaString(val.text()).toUtf8());
+//                    //printf("%s : %s \n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(), UaString(val1.text()).toUtf8());
+//            }
+//            else
+//            {
+//                    printf("Read failed for %s with status %s\n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(),UaStatus(values[0].StatusCode).toString().toUtf8());
+//            }
+//        }
+//    else
+//        {
+//            // Service call failed
+//            printf("Read failed with status %s\n", result.toString().toUtf8());
+//        break;
+//        }
+//    }
+
+//    return result;
+//}

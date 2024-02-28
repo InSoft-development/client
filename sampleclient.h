@@ -30,6 +30,7 @@
 #include "uaclientsdk.h"
 #include <map>
 #include <string.h>
+#include <fstream>
 #include <vector>
 #include <numeric>
 #include <sqlite3.h>
@@ -56,10 +57,10 @@ public:
     UaStatus readHistory(const char*,const char*,int,int,bool);
     UaStatus subscribe();
     UaStatus unsubscribe();
-    UaStatus returnNames();
+//    UaStatus returnNames();
     UaStatus browseSimple(std::string, bool);
     UaStatus browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn, bool recursive);
-    void printBrowseResults(const UaReferenceDescriptions& referenceDescriptions, std::ofstream*);
+    void printBrowseResults(const UaReferenceDescriptions& referenceDescriptions);
 
 
 private:
@@ -72,6 +73,7 @@ private:
     unsigned short ns;
     std::map<std::string,std::vector<double>> slice_data;
     std::vector<std::string> kks_array;
+    std::ofstream kks_fstream;
     sqlite3 *db;
     void init_db();
 };
