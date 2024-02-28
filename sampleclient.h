@@ -59,7 +59,7 @@ public:
     UaStatus returnNames();
     UaStatus browseSimple(std::string, bool);
     UaStatus browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn, bool recursive);
-    void printBrowseResults(const UaReferenceDescriptions& referenceDescriptions);
+    void printBrowseResults(const UaReferenceDescriptions& referenceDescriptions, std::ofstream*);
 
 
 private:

@@ -580,6 +580,7 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
     BrowseContext browseContext;
     UaByteString continuationPoint;
     UaReferenceDescriptions referenceDescriptions;
+    std::ofstream kks("kks.csv");
     // configure browseContext
     browseContext.browseDirection = OpcUa_BrowseDirection_Forward;
     browseContext.referenceTypeId = OpcUaId_HierarchicalReferences;
@@ -595,7 +596,7 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
     if (result.isGood())
     {
         // print results
-        printBrowseResults(referenceDescriptions);
+        printBrowseResults(referenceDescriptions,&kks);
         if (recursive)
             for (OpcUa_UInt32 i=0; i<referenceDescriptions.length(); i++)
             {
@@ -614,7 +615,7 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
             if (result.isGood())
             {
                 // print results
-                printBrowseResults(referenceDescriptions);
+                printBrowseResults(referenceDescriptions,&kks);
                 if (recursive)
                     for (OpcUa_UInt32 i=0; i<referenceDescriptions.length(); i++)
                     {
@@ -636,7 +637,7 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
     return result;
 }
 
-void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDescriptions)
+void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDescriptions, std::ofstream* kks)
 {
 
     UaStatus result;
@@ -652,42 +653,42 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
     {
         nodeToRead.resize(1);
         UaNodeId nodeId(referenceDescriptions[i].NodeId.NodeId);
-        printf("%s\n", nodeId.toString().toUtf8() );
+        *kks<<nodeId.toString().toUtf8()<<"\n";
 
-        nodeToRead[0].AttributeId = OpcUa_Attributes_Description;
-        UaNodeId test(UaString(nodeId.toString().toUtf8()),ns);
-        test.copyTo(&nodeToRead[0].NodeId);
-        nodeId.copyTo(&nodeToRead[0].NodeId);
-        result = m_pSession->read(serviceSettings,
-                                  0,
-                                  OpcUa_TimestampsToReturn_Both,
-                                  nodeToRead,
-                                  values,
-                                  diagnosticInfos);
+//        nodeToRead[0].AttributeId = OpcUa_Attributes_Description;
+//        UaNodeId test(UaString(nodeId.toString().toUtf8()),ns);
+//        test.copyTo(&nodeToRead[0].NodeId);
+//        nodeId.copyTo(&nodeToRead[0].NodeId);
+//        result = m_pSession->read(serviceSettings,
+//                                  0,
+//                                  OpcUa_TimestampsToReturn_Both,
+//                                  nodeToRead,
+//                                  values,
+//                                  diagnosticInfos);
 
 
-        if (result.isGood())
-        {
-            // Read service succeded - check status of read value
-            if (read_bad || OpcUa_IsGood(values[0].StatusCode))
-            {
-                    UaVariant tempValue = values[0].Value;
-                    UaLocalizedText val;
-                    tempValue.toLocalizedText(val);
-                    printf("%s;%s\n", nodeId.toString().toUtf8(), UaString(val.text()).toUtf8());
-            }
-            else
-            {
-                    printf("%s\n", nodeId.toString().toUtf8() );
-                    //printf("Read failed for %s with status %s\n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(),UaStatus(values[0].StatusCode).toString().toUtf8());
-            }
-        }
-    else
-        {
-            // Service call failed
-            printf("Read failed with status %s\n", result.toString().toUtf8());
-        break;
-        }
+//        if (result.isGood())
+//        {
+//            // Read service succeded - check status of read value
+//            if (read_bad || OpcUa_IsGood(values[0].StatusCode))
+//            {
+//                    UaVariant tempValue = values[0].Value;
+//                    UaLocalizedText val;
+//                    tempValue.toLocalizedText(val);
+//                    printf("%s;%s\n", nodeId.toString().toUtf8(), UaString(val.text()).toUtf8());
+//            }
+//            else
+//            {
+//                    printf("%s\n", nodeId.toString().toUtf8() );
+//                    //printf("Read failed for %s with status %s\n", UaNodeId(nodeToRead[0].NodeId).toXmlString().toUtf8(),UaStatus(values[0].StatusCode).toString().toUtf8());
+//            }
+//        }
+//        else
+//        {
+//            // Service call failed
+//            printf("Read failed with status %s\n", result.toString().toUtf8());
+//        break;
+//        }
 
     }
 }
