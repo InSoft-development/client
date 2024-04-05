@@ -167,19 +167,19 @@ void SampleClient::connectionStatusChanged(
     {
     case UaClient::Disconnected:
         fprintf(stderr,"Connection status changed to Disconnected\n");
-        break;
+        exit(1);
     case UaClient::Connected:
         printf("Connection status changed to Connected\n");
         break;
     case UaClient::ConnectionWarningWatchdogTimeout:
         fprintf(stderr,"Connection status changed to ConnectionWarningWatchdogTimeout\n");
-        break;
+        exit(1);
     case UaClient::ConnectionErrorApiReconnect:
         fprintf(stderr,"Connection status changed to ConnectionErrorApiReconnect\n");
         break;
     case UaClient::ServerShutdown:
         fprintf(stderr,"Connection status changed to ServerShutdown\n");
-        break;
+        exit(1);
     case UaClient::NewSessionCreated:
         printf("Connection status changed to NewSessionCreated\n");
         break;
