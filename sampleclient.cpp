@@ -37,6 +37,21 @@
 #include "uathread.h"
 #include <fstream>
 #include <string.h>
+#include <signal.h>
+volatile static bool exit_flag = false;
+volatile static bool browse_internal = false;
+
+
+void signalHandler_for_browse(int signum)
+{
+
+       printf("Interrupt in client!\n");
+       if (browse_internal)
+           exit_flag = true;
+       else {
+           raise(signum);
+       }
+}
 
 SampleClient::SampleClient(int d, int m, int n = 1, bool r=false, bool b=false)
 {
@@ -64,11 +79,7 @@ SampleClient::~SampleClient()
     if (m_pSession)
     {
         // disconnect if we're still connected
-        if (m_pSession->isConnected() != OpcUa_False)
-        {
-            ServiceSettings serviceSettings;
-            m_pSession->disconnect(serviceSettings, OpcUa_True);
-        }
+        disconnect();
         delete m_pSession;
         m_pSession = NULL;
     }
@@ -77,6 +88,7 @@ SampleClient::~SampleClient()
     {
         std::cout<<"Close DB\n";
         sqlite3_close(db);
+        std::cout<<"DB Closed\n";
     }
 }
 
@@ -154,19 +166,19 @@ void SampleClient::connectionStatusChanged(
     switch (serverStatus)
     {
     case UaClient::Disconnected:
-        printf("Connection status changed to Disconnected\n");
+        fprintf(stderr,"Connection status changed to Disconnected\n");
         break;
     case UaClient::Connected:
         printf("Connection status changed to Connected\n");
         break;
     case UaClient::ConnectionWarningWatchdogTimeout:
-        printf("Connection status changed to ConnectionWarningWatchdogTimeout\n");
+        fprintf(stderr,"Connection status changed to ConnectionWarningWatchdogTimeout\n");
         break;
     case UaClient::ConnectionErrorApiReconnect:
-        printf("Connection status changed to ConnectionErrorApiReconnect\n");
+        fprintf(stderr,"Connection status changed to ConnectionErrorApiReconnect\n");
         break;
     case UaClient::ServerShutdown:
-        printf("Connection status changed to ServerShutdown\n");
+        fprintf(stderr,"Connection status changed to ServerShutdown\n");
         break;
     case UaClient::NewSessionCreated:
         printf("Connection status changed to NewSessionCreated\n");
@@ -215,7 +227,7 @@ UaStatus SampleClient::connect()
     }
     else
     {
-        printf("Connect failed with status %s\n", result.toString().toUtf8());
+        fprintf(stderr, "Connect failed with status %s\n", result.toString().toUtf8());
     }
 
     return result;
@@ -223,26 +235,29 @@ UaStatus SampleClient::connect()
 
 UaStatus SampleClient::disconnect()
 {
-    UaStatus result;
 
-    // Default settings like timeout
-    ServiceSettings serviceSettings;
+    if (m_pSession->isConnected() == OpcUa_False)
+        return UaStatus(OpcUa_Good);
+    else {
+        UaStatus result;
+        // Default settings like timeout
+        ServiceSettings serviceSettings;
+        printf("\nDisconnecting ...\n");
+        result = m_pSession->disconnect(
+            serviceSettings,
+            OpcUa_True);
 
-    printf("\nDisconnecting ...\n");
-    result = m_pSession->disconnect(
-        serviceSettings,
-        OpcUa_True);
+        if (result.isGood())
+        {
+            printf("Disconnect succeeded\n");
+        }
+        else
+        {
+            fprintf(stderr, "Disconnect failed with status %s\n", result.toString().toUtf8());
+        }
 
-    if (result.isGood())
-    {
-        printf("Disconnect succeeded\n");
+        return result;
     }
-    else
-    {
-        printf("Disconnect failed with status %s\n", result.toString().toUtf8());
-    }
-
-    return result;
 }
 
 UaStatus SampleClient::read()
@@ -289,13 +304,13 @@ UaStatus SampleClient::read()
         	}	
         	else
         	{
-            		printf("Read failed for %s with status %s\n", UaNodeId(nodeToRead[item_index].NodeId).toXmlString().toUtf8(),UaStatus(values[0].StatusCode).toString().toUtf8());
+                    fprintf(stderr, "Read failed for %s with status %s\n", UaNodeId(nodeToRead[item_index].NodeId).toXmlString().toUtf8(),UaStatus(values[0].StatusCode).toString().toUtf8());
         	}
     	}
    	else
     	{
         	// Service call failed
-        	printf("Read failed with status %s\n", result.toString().toUtf8());
+            fprintf(stderr, "Read failed with status %s\n", result.toString().toUtf8());
 		break;
     	}
     }
@@ -394,7 +409,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     	/*********************************************************************/
         if ( status.isNotGood() )
     	{
-    		printf("** Error: %s UaSession::historyReadRawModified failed [ret=%s]\n", kks.c_str(), status.toString().toUtf8());
+            fprintf(stderr, "** Error: %s UaSession::historyReadRawModified failed [ret=%s]\n", kks.c_str(), status.toString().toUtf8());
     		failed_kks << kks << "\n";
     		continue;//return status;
     	}
@@ -484,7 +499,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
 						diagnosticInfos);
     			if ( status.isBad() )
     			{
-    				printf("** Error: %s UaSession::historyReadRawModified with CP failed [ret=%s]\n", kks.c_str(), status.toString().toUtf8());
+                    fprintf(stderr, "** Error: %s UaSession::historyReadRawModified with CP failed [ret=%s]\n", kks.c_str(), status.toString().toUtf8());
     				failed_kks << kks << "\n";
     				break;//return status;
     			}
@@ -570,6 +585,8 @@ UaStatus SampleClient::browseSimple(std::string kks, bool recursive)//const UaNo
     else
         nodeToBrowse = UaNodeId(UaString(kks.c_str()),ns);
     kks_fstream.open("kks.csv");
+    browse_internal = true;
+    signal(SIGINT, signalHandler_for_browse);
     result = browseInternal(nodeToBrowse, 0, recursive);
     kks_fstream.close();
     return result;
@@ -600,7 +617,7 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
         // print results
         printBrowseResults(referenceDescriptions);
         if (recursive)
-            for (OpcUa_UInt32 i=0; i<referenceDescriptions.length(); i++)
+            for (OpcUa_UInt32 i=0; i<referenceDescriptions.length() && exit_flag != true; i++)
             {
                 browseInternal(referenceDescriptions[i].NodeId.NodeId,0,recursive);
             }
@@ -619,7 +636,7 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
                 // print results
                 printBrowseResults(referenceDescriptions);
                 if (recursive)
-                    for (OpcUa_UInt32 i=0; i<referenceDescriptions.length(); i++)
+                    for (OpcUa_UInt32 i=0; i<referenceDescriptions.length() && exit_flag != true; i++)
                     {
                         browseInternal(referenceDescriptions[i].NodeId.NodeId,0,recursive);
                     }
@@ -627,14 +644,14 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
             else
             {
                 // Service call failed
-                printf("BrowseNext failed with status %s\n", result.toString().toUtf8());
+                fprintf(stderr, "BrowseNext failed with status %s\n", result.toString().toUtf8());
             }
         }
     }
     else
     {
         // Service call failed
-        printf("Browse failed with status %s\n", result.toString().toUtf8());
+        fprintf(stderr, "Browse failed with status %s\n", result.toString().toUtf8());
     }
 
     return result;
@@ -686,7 +703,7 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
         else
         {
             // Service call failed
-            printf("read description for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
+            fprintf(stderr, "read description for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
         }
 
         nodeToRead[0].AttributeId = OpcUa_Attributes_DataType;
@@ -728,7 +745,7 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
                 else
                 {
                     // Service call failed
-                    printf("read data type disaplay name for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
+                    fprintf(stderr, "read data type disaplay name for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
                 }
 
             }
@@ -736,7 +753,7 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
         else
         {
             // Service call failed
-            printf("read data type for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
+            fprintf(stderr, "read data type for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
         }
 
         kks_fstream<<nodeId.toString().toUtf8()<<";"<<type<<";\""<< description<<"\"\n";

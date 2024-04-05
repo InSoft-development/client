@@ -39,15 +39,15 @@ bool online = false;
 void signalHandler(int signum)
 {
 
-	   printf("Interrupt!");
+       printf("Interrupt!\n");
        if (online)
            exit_flag = true;
        else {
-           if (status_run.isGood())
-           {
-               //pMyClient->unsubscribe();
-               pMyClient->disconnect();
-           }
+//           if (status_run.isGood())
+//           {
+//               //pMyClient->unsubscribe();
+//               pMyClient->disconnect(); // deprecated: in destructor
+//           }
            if (pMyClient)
            {
                delete pMyClient;
@@ -294,7 +294,7 @@ HISTORY MODE:\n\
 //        //getchar();
 
 //        // Disconnect from OPC UA Server
-        pMyClient->disconnect();
+//        pMyClient->disconnect(); // deprecated: in destructor
     }
 
     // Close application
@@ -304,9 +304,11 @@ HISTORY MODE:\n\
 
     delete pMyClient;
     pMyClient = NULL;
+    printf("deleted pMyClient\n");
 
     // Cleanup the UA Stack platform layer
     UaPlatformLayer::cleanup();
+    printf("UaPlatformLayer::cleanup\n");
 
     return 0;
 }

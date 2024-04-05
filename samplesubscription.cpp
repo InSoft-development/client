@@ -69,7 +69,7 @@ void SampleSubscription::subscriptionStatusChanged(
 {
     OpcUa_ReferenceParameter(clientSubscriptionHandle); // We use the callback only for this subscription
 
-    printf("Subscription not longer valid - failed with status %s\n", status.toString().toUtf8());
+    fprintf(stderr, "Subscription not longer valid - failed with status %s\n", status.toString().toUtf8());
 }
 
 void SampleSubscription::dataChange(
@@ -138,7 +138,7 @@ void SampleSubscription::dataChange(
         else
         {
             UaStatus itemError(dataNotifications[i].Value.StatusCode);
-            printf("  Variable %s failed with status %s\n", kks_array[dataNotifications[i].ClientHandle].c_str(), itemError.toString().toUtf8());
+            fprintf(stderr, "  Variable %s failed with status %s\n", kks_array[dataNotifications[i].ClientHandle].c_str(), itemError.toString().toUtf8());
         }
     }
     printf("------------------------------------------------------------\n");
@@ -180,7 +180,7 @@ UaStatus SampleSubscription::createSubscription(UaSession* pSession)
 
     if ( m_pSubscription )
     {
-        printf("\nError: Subscription already created\n");
+        fprintf(stderr, "\nError: Subscription already created\n");
         return OpcUa_BadInvalidState;
     }
 
@@ -209,7 +209,7 @@ UaStatus SampleSubscription::createSubscription(UaSession* pSession)
     else
     {
         m_pSubscription = NULL;
-        printf("CreateSubscription failed with status %s\n", result.toString().toUtf8());
+        fprintf(stderr, "CreateSubscription failed with status %s\n", result.toString().toUtf8());
     }
 
     return result;
@@ -219,7 +219,7 @@ UaStatus SampleSubscription::deleteSubscription()
 {
     if ( m_pSubscription == NULL )
     {
-        printf("\nError: No Subscription created\n");
+        fprintf(stderr, "\nError: No Subscription created\n");
         return OpcUa_BadInvalidState;
     }
 
@@ -238,7 +238,7 @@ UaStatus SampleSubscription::deleteSubscription()
     }
     else
     {
-        printf("DeleteSubscription failed with status %s\n", result.toString().toUtf8());
+        fprintf(stderr, "DeleteSubscription failed with status %s\n", result.toString().toUtf8());
     }
     m_pSubscription = NULL;
 
@@ -250,7 +250,7 @@ UaStatus SampleSubscription::createMonitoredItems()
 {
     if ( m_pSubscription == NULL )
     {
-        printf("\nError: No Subscription created\n");
+        fprintf(stderr, "\nError: No Subscription created\n");
         return OpcUa_BadInvalidState;
     }
 
@@ -313,7 +313,7 @@ UaStatus SampleSubscription::createMonitoredItems()
             }
             else
             {
-                printf("CreateMonitoredItems failed for item: %s - Status %s\n",
+                fprintf(stderr, "CreateMonitoredItems failed for item: %s - Status %s\n",
                     UaNodeId(itemsToCreate[i].ItemToMonitor.NodeId).toXmlString().toUtf8(),
                     UaStatus(createResults[i].StatusCode).toString().toUtf8());
             }
@@ -322,7 +322,7 @@ UaStatus SampleSubscription::createMonitoredItems()
     // service call failed
     else
     {
-        printf("CreateMonitoredItems failed with status %s\n", result.toString().toUtf8());
+        fprintf(stderr, "CreateMonitoredItems failed with status %s\n", result.toString().toUtf8());
     }
 
     return result;
