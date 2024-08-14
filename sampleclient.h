@@ -34,16 +34,48 @@
 #include <vector>
 #include <numeric>
 #include <sqlite3.h>
+#include <clickhouse/client.h>
 
 class SampleSubscription;
 
 using namespace UaClientSdk;
 
+class database
+{
+public:
+    bool rewrite = false;
+    virtual void init_db(std::vector<std::string>) = 0;
+    virtual int exec(const char*) = 0;
+    virtual ~database(){};
+};
+
+class sqlite_database : public database
+{
+public:
+    sqlite_database(bool);
+    void init_db(std::vector<std::string>);
+    int exec(const char*);
+    ~sqlite_database();
+private:
+    sqlite3 *sq_db;
+};
+
+class clickhouse_database : public database
+{
+public:
+    clickhouse_database(bool, const char*);
+    void init_db(std::vector<std::string>);
+    int exec(const char*);
+    ~clickhouse_database();
+private:
+    clickhouse::Client* ch_db;
+};
+
 class SampleClient : public UaSessionCallback
 {
     UA_DISABLE_COPY(SampleClient);
 public:
-    SampleClient(int,int,int,bool,bool);
+    SampleClient(int,int,int,bool,bool,std::string);
     virtual ~SampleClient();
 
     // UaSessionCallback implementation ----------------------------------------------------
@@ -66,7 +98,6 @@ public:
 private:
     UaSession*          m_pSession;
     SampleSubscription* m_pSampleSubscription;
-    bool rewrite;
     bool read_bad;
     int delta;
     int mean;
@@ -74,9 +105,10 @@ private:
     std::map<std::string,std::vector<double>> slice_data;
     std::vector<std::string> kks_array;
     std::ofstream kks_fstream;
-    sqlite3 *db;
+    database* db;
     void init_db();
 };
+
 
 
 #endif // SAMPLECLIENT_H

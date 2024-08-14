@@ -10,13 +10,14 @@ import numpy as np
 import traces as tr
 import numba
 import sqlite3
+import dateutil.parser
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="dump slices of data from archive")
-    # parser.add_argument("--delta", "-d", type=int, help="delta between slices in seconds before merge5 (default 60 sec)", default=60)
-    parser.add_argument("--interval", "--time", "-t", nargs=2, required=True, type=datetime.datetime.fromisoformat,
-                        help="two timestamps, period, format YYY-MM-DD HH:MM:SS.SSS")
+    parser.add_argument("--delta", "-d", type=int, help="delta between slices in miliseconds (default 60 sec)", default=60000)
+    parser.add_argument("--interval", "--time", "-t", nargs=2, required=True, type=str,
+                        help="two timestamps, period, format \"YYY-MM-DD HH:MM:SS.SSS\" \"YYY-MM-DD HH:MM:SS.SSS\"" )
     parser.add_argument("--output", "-o", default="slices.csv", type=str,
                         help="output file")
     parser.add_argument("--input", "-i", default="data.sqlite", type=str,
@@ -63,8 +64,9 @@ if __name__ == '__main__':
     print(args)
     # открыть ккс.цсв, считать датчики
     nums = pd.read_csv("kks.csv", header=None)[0].to_list()  # ["20MAD11CY004"] #
-    start_date = args.interval[0]  # datetime.datetime(2021, 6, 1)
-    end_date = args.interval[1]  # datetime.datetime(2022, 10, 30)
+    start_date = dateutil.parser.parse(args.interval[0])  # datetime.datetime(2021, 6, 1)
+    end_date = dateutil.parser.parse(args.interval[1])  # datetime.datetime(2022, 10, 30)
+    delta = args.delta 
     # загрузить датафрейм из цсв
     # start_time = time.time()
     # print("data read")
@@ -126,17 +128,17 @@ if __name__ == '__main__':
         print(kks)
         conn_raw = sqlite3.connect(infile)
         sql = ("SELECT t as timestamp,val as value FROM dynamic_data WHERE id=\"" +
-               kks + "\" and t > \"" + start_date.isoformat() + "\" and t < \"" +
-               end_date.isoformat() + "\"")
+               kks + "\" and t > \"" + args.interval[0]+ "\" and t < \"" +
+               args.interval[1]  + "\"")
+        print(sql)
         data_column = pd.read_sql(sql, conn_raw,parse_dates=['timestamp'])
         if len(data_column) == 0:
             print("missing data!!")
             data_column = pd.DataFrame([{"timestamp": start_date, "value": 0},
                                         {"timestamp": end_date, "value": 0}])
-        # print(len(data_column))
+        print(data_column)
         ts = tr.TimeSeries(data_column.values)
-        column = ts.sample(sampling_period=datetime.timedelta(minutes=1),
-                           # sampling_period=delta,
+        column = ts.sample(sampling_period=datetime.timedelta(milliseconds=delta/5),
                            start=start_date,
                            end=end_date)  # ,
         # interpolate='previous')

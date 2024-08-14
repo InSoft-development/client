@@ -70,10 +70,12 @@ int main(int argc, char*argv[])
 	// register signal SIGINT and signal handler
 
    signal(SIGINT, signalHandler);
+   signal(SIGTERM, signalHandler);
 
 	static struct option long_options[] =
 	{
             {"online",0,NULL,'o'},
+            {"clickhouse-server",0, NULL,'u'},
             {"history",0,NULL,'i'},
             {"delta", 0, NULL,'d'},
             {"mean", 0, NULL,'m'},
@@ -105,9 +107,10 @@ int main(int argc, char*argv[])
     bool history_mode = true;
     std::string kks = "";
     bool recursive = false;
+    std::string clickhouse = "";
 	// loop over all of the options
 	int ch;
-    while ((ch = getopt_long(argc, argv, "hod:m:s:b:e:p:t:rnwxk:ic", long_options, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "hou:d:m:s:b:e:p:t:rnwxk:ic", long_options, NULL)) != -1)
 	{
 	    // check to see if a single character or long option came through
 	    switch (ch)
@@ -115,6 +118,7 @@ int main(int argc, char*argv[])
 	    	 case 'h':
 	    		 printf("read data from OPC UA\noptions:\n\
 --help(-h) this info\n\
+--clickhouse-server (-u) clickhouse server ip:port\n\
 --ns(-s) number of space (1 by default)\n\
 --kks(-k) <id> kks browse mode \n\
                  list subobjects from <id> object, strings, values, variables etc. \n\
@@ -140,6 +144,10 @@ HISTORY MODE:\n\
                 online = true;
                 history_mode = false;
                 printf("online mode");
+                break;
+            case 'u':
+                clickhouse = optarg;
+                printf("clickhouse_server %s, ", clickhouse.c_str());
                 break;
             case 'd':
                 delta = atoi(optarg);
@@ -239,13 +247,15 @@ HISTORY MODE:\n\
         printf("timeout = %i, ", timeout);
         printf("read bounds = %s \n", read_bounds?"true":"false");
     }
+    if (clickhouse != "")
+        printf("using clickhouse\n");
     printf("rewrite = %s \n", rewrite?"true":"false");
 
     // Initialize the UA Stack platform layer
     UaPlatformLayer::init();
 
     // Create instance of SampleClient
-    pMyClient = new SampleClient(delta,mean,ns,rewrite,read_bad);
+    pMyClient = new SampleClient(delta,mean,ns,rewrite,read_bad,clickhouse);
 
     // Connect to OPC UA Server
     status_run = pMyClient->connect();

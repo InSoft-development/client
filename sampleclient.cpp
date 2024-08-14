@@ -53,15 +53,20 @@ void signalHandler_for_browse(int signum)
        }
 }
 
-SampleClient::SampleClient(int d, int m, int n = 1, bool r=false, bool b=false)
+SampleClient::SampleClient(int d, int m, int n = 1, bool r=false, bool b=false, std::string c = "")
 {
     m_pSession = new UaSession();
-    rewrite = r;
     db = NULL;
     delta = d;
     mean = m;
     ns = n;
     read_bad = b;
+    if (c == ""){
+        printf("empty\n\n");
+
+        db = new sqlite_database(r);}
+    else
+        db = new clickhouse_database(r, c.c_str());
     m_pSampleSubscription = new SampleSubscription(delta);
 
     init_db();
@@ -84,10 +89,10 @@ SampleClient::~SampleClient()
         m_pSession = NULL;
     }
 
-    if (db)
+    if (db != nullptr)
     {
         std::cout<<"Close DB\n";
-        sqlite3_close(db);
+        delete db;
         std::cout<<"DB Closed\n";
     }
 }
@@ -111,49 +116,7 @@ void SampleClient::init_db()
         kks_array.push_back(kks);
         slice_data[kks] = std::vector<double>();
     }
-
-    /* Open database */
-    char *zErrMsg = 0;
-    int rc = sqlite3_open("data.sqlite", &db);
-    if( rc ) {
-       fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
-    }
-    if (rewrite)
-    {
-        /* Create SQL statement */
-        std::string kks_string;
-        for (auto k : kks_array)
-        {
-            kks_string += k;
-            kks_string += "\" real, \"";
-        }
-        if (!kks_string.empty())
-            kks_string.erase(kks_string.size()-3);
-
-        std::string sql = std::string("DROP TABLE IF EXISTS synchro_data; CREATE TABLE synchro_data ( \"") + kks_string +
-                                      std::string(", \"timestamp\" timestamp with time zone NOT NULL );");
-        printf("%s\n",sql.c_str());
-        /* Execute SQL statement */
-        rc = sqlite3_exec(db, sql.c_str(), callback, 0, &zErrMsg);
-        if( rc != SQLITE_OK )
-        {
-            fprintf(stderr, "SQL error: %s\n", zErrMsg);
-            sqlite3_free(zErrMsg);
-        }
-
-        /* Create SQL statement */
-        sql = std::string("DROP TABLE IF EXISTS dynamic_data; CREATE TABLE dynamic_data ( id text, t timestamp without time zone NOT NULL, val real, status text )");
-        printf("%s\n",sql.c_str());
-        /* Execute SQL statement */
-        rc = sqlite3_exec(db, sql.c_str(), callback, 0, &zErrMsg);
-        if( rc != SQLITE_OK )
-        {
-            fprintf(stderr, "SQL error: %s\n", zErrMsg);
-            sqlite3_free(zErrMsg);
-        }
-    }
-
-
+    db->init_db(kks_array);
 }
 
 void SampleClient::connectionStatusChanged(
@@ -167,7 +130,8 @@ void SampleClient::connectionStatusChanged(
     {
     case UaClient::Disconnected:
         fprintf(stderr,"Connection status changed to Disconnected\n");
-        exit(1);
+        break;
+        //exit(1);
     case UaClient::Connected:
         printf("Connection status changed to Connected\n");
         break;
@@ -335,11 +299,8 @@ UaStatus SampleClient::read()
         std::cout<< "\n SQL:\n" << sql<< "\n";
         /* Execute SQL statement */
         char *zErrMsg = NULL;
-        int rc = sqlite3_exec(db, sql.c_str(), callback, 0, &zErrMsg);
-        if( rc != SQLITE_OK ){
-        fprintf(stderr, "SQL error: %s\n", zErrMsg);
-            sqlite3_free(zErrMsg);
-        }
+        db->exec(sql.c_str());
+
         iteration_count = 0;
 
     }
@@ -424,7 +385,8 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                 {
                     failed_kks << kks << "\n";
                 }
-                sql = std::string("BEGIN;\n");
+                sql = std::string("INSERT INTO dynamic_data1 (id,t,val,status) VALUES ");
+
     			for ( j=0; j<results[i].m_dataValues.length(); j++ )
     			{
     				UaStatus statusOPLevel(results[i].m_dataValues[j].StatusCode);
@@ -434,11 +396,10 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                     if ( read_bad || OpcUa_IsGood(results[i].m_dataValues[j].StatusCode) )
     				{
     					UaVariant tempValue = results[i].m_dataValues[j].Value;
-                        sql += std::string("INSERT INTO dynamic_data (id,t,val,status) VALUES (\"") +
-                                kks + "\" , \"" + sourceTS.c_str() + "\", " +
-                                tempValue.toString().toUtf8() + ", \"" +
-                                statusOPLevel.toString().toUtf8() + "\" );\n";
-                        //printf("%s\n",sql.c_str());
+                        sql += std::string(" (\'") +
+                                kks + "\' , \'" + sourceTS.c_str() + "\', " +
+                                tempValue.toString().toUtf8() + ", \'" +
+                                statusOPLevel.toString().toUtf8() + "\' ),\n";
 
                     }
 //    				else
@@ -451,12 +412,13 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
 //
 //    				}
     			}
-                sql += std::string("COMMIT;\n");
-                /* Execute SQL statement */
-                rc = sqlite3_exec(db, sql.c_str(), callback, 0, &zErrMsg);
-                if( rc != SQLITE_OK ){
-                fprintf(stderr, "SQL error: %s\n", zErrMsg);
-                    sqlite3_free(zErrMsg);
+                sql.pop_back();
+                sql.pop_back();
+                sql += ";";
+                if (j>0)
+                {
+                    printf("1: %s\n", sql.c_str());
+                    db->exec( sql.c_str());
                 }
 
 
@@ -510,7 +472,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     				{
     					UaStatus nodeResult(results[i].m_status);
                         printf("** ContinuationPoint Results %d Node=%s status=%s length=%d\n", i, nodeToRead.toXmlString().toUtf8(), nodeResult.toString().toUtf8(),results[i].m_dataValues.length());
-                        sql = std::string("BEGIN;\n");
+                        sql = std::string("INSERT INTO dynamic_data1 (id,t,val,status) VALUES ");
 
                         for ( j=0; j<results[i].m_dataValues.length(); j++ )
     					{
@@ -522,11 +484,10 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     						{
 
                                 UaVariant tempValue = results[i].m_dataValues[j].Value;
-                                sql += std::string("INSERT INTO dynamic_data (id,t,val,status) VALUES (\"") +
-                                        kks + "\" , \"" + sourceTS.c_str() + "\", " +
-                                        tempValue.toString().toUtf8() + ", \"" +
-                                        statusOPLevel.toString().toUtf8() + "\" );\n";
-                                //printf("%s\n",sql.c_str());
+                                sql += std::string(" (\'") +
+                                        kks + "\' , \'" + sourceTS.c_str() + "\', " +
+                                        tempValue.toString().toUtf8() + ", \'" +
+                                        statusOPLevel.toString().toUtf8() + "\' ),\n";
 
                             }
 //    						else
@@ -538,13 +499,15 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
 //										statusOPLevel.toString().toUtf8());
 //    						}
     					}
-                        sql += std::string("COMMIT;\n");
-                        /* Execute SQL statement */
-                        rc = sqlite3_exec(db, sql.c_str(), callback, 0, &zErrMsg);
-                        if( rc != SQLITE_OK ){
-                        fprintf(stderr, "SQL error: %s\n", zErrMsg);
-                            sqlite3_free(zErrMsg);
+                        sql.pop_back();
+                        sql.pop_back();
+                        sql += ";";
+                        if (j>0)
+                        {
+                            printf("2: %s\n", sql.c_str());
+                            db->exec( sql.c_str());
                         }
+
     				}
     			}
     		}
@@ -587,6 +550,8 @@ UaStatus SampleClient::browseSimple(std::string kks, bool recursive)//const UaNo
     kks_fstream.open("kks.csv");
     browse_internal = true;
     signal(SIGINT, signalHandler_for_browse);
+    signal(SIGTERM, signalHandler_for_browse);
+
     result = browseInternal(nodeToBrowse, 0, recursive);
     kks_fstream.close();
     return result;
@@ -838,3 +803,140 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
 
 //    return result;
 //}
+
+sqlite_database::sqlite_database(bool r)
+{
+    /* Open database */
+    int rc = sqlite3_open("data.sqlite", &sq_db);
+    if( rc ) {
+       fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(sq_db));
+    }
+    rewrite = r;
+}
+
+
+sqlite_database::~sqlite_database()
+{
+    sqlite3_close(sq_db);
+}
+
+void sqlite_database::init_db(std::vector<std::string> kks_array)
+{
+    printf("init sqlite tables\n");
+    char *zErrMsg = 0;
+    int rc;
+    if (rewrite)
+    {
+        /* Create SQL statement */
+        std::string kks_string;
+        for (auto k : kks_array)
+        {
+            kks_string += k;
+            kks_string += "\" real, \"";
+        }
+        if (!kks_string.empty())
+            kks_string.erase(kks_string.size()-3);
+
+        std::string sql = std::string("DROP TABLE IF EXISTS synchro_data; CREATE TABLE synchro_data ( \"") + kks_string +
+                                      std::string(", \"timestamp\" timestamp with time zone NOT NULL );");
+        printf("%s\n",sql.c_str());
+        /* Execute SQL statement */
+        rc = sqlite3_exec(sq_db, sql.c_str(), callback, 0, &zErrMsg);
+        if( rc != SQLITE_OK )
+        {
+            fprintf(stderr, "SQL error: %s\n", zErrMsg);
+            sqlite3_free(zErrMsg);
+        }
+
+        /* Create SQL statement */
+        sql = std::string("DROP TABLE IF EXISTS dynamic_data; CREATE TABLE dynamic_data1 ( id text, t timestamp without time zone NOT NULL, val real, status text )");
+        printf("%s\n",sql.c_str());
+        /* Execute SQL statement */
+        rc = sqlite3_exec(sq_db, sql.c_str(), callback, 0, &zErrMsg);
+        if( rc != SQLITE_OK )
+        {
+            fprintf(stderr, "SQL error: %s\n", zErrMsg);
+            sqlite3_free(zErrMsg);
+        }
+    }
+
+}
+
+int sqlite_database::exec(const char* sql)
+{
+    char *zErrMsg = 0;
+    int rc;
+    rc = sqlite3_exec(sq_db, sql, callback, 0, &zErrMsg);
+    if( rc != SQLITE_OK ){
+    fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        sqlite3_free(zErrMsg);
+    }
+    return rc;
+
+}
+
+clickhouse_database::clickhouse_database(bool r, const char* server)
+{
+    printf("Initialize client connection\n");
+    ch_db = new clickhouse::Client(clickhouse::ClientOptions().SetHost(server)
+                                   .SetUser("default")
+                                   .SetPassword("asdf"));
+    rewrite = r;
+}
+
+
+clickhouse_database::~clickhouse_database()
+{
+    delete ch_db;
+}
+
+void clickhouse_database::init_db(std::vector<std::string> kks_array)
+{
+    printf("init clickhouse tables\n");
+    if (rewrite)
+    {
+        /* Create SQL statement */
+        std::string kks_string;
+        for (auto k : kks_array)
+        {
+            kks_string += k;
+            kks_string += "\" Float64, \"";
+        }
+        if (!kks_string.empty())
+            kks_string.erase(kks_string.size()-3);
+
+        std::string sql = std::string("DROP TABLE IF EXISTS synchro_data1;");
+        printf("%s\n",sql.c_str());
+        /* Execute SQL statement */
+        exec(sql.c_str());
+        sql = std::string("CREATE TABLE synchro_data1 ( \"") + kks_string +
+                                      std::string(", \"timestamp\" DateTime64(3,'Europe/Moscow') ) "
+                                                  " ENGINE = MergeTree() PARTITION BY toYYYYMM(timestamp)"
+                                                  " ORDER BY (timestamp) PRIMARY KEY (timestamp)");
+        printf("%s\n",sql.c_str());
+        /* Execute SQL statement */
+        exec(sql.c_str());
+
+
+        /* Create SQL statement */
+        sql = std::string("DROP TABLE IF EXISTS dynamic_data1;");
+        printf("%s\n",sql.c_str());
+        /* Execute SQL statement */
+        exec(sql.c_str());
+        /* Create SQL statement */
+        sql = std::string("CREATE TABLE dynamic_data1 ( id text, t DateTime64(3,'Europe/Moscow'), "
+                          "val Float64, status text ) ENGINE = MergeTree()"
+                          " PARTITION BY toYYYYMM(t) ORDER BY (t) PRIMARY KEY (t)");
+        printf("%s\n",sql.c_str());
+        /* Execute SQL statement */
+        exec(sql.c_str());
+    }
+
+}
+
+int clickhouse_database::exec(const char* sql)
+{
+    ch_db->Execute(sql);
+    return 0;
+}
+
