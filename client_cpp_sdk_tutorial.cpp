@@ -137,7 +137,7 @@ HISTORY MODE:\n\
 --timeout(-t) <ms> maximum timeout, that we are waiting for response from server\n\
 --read-bounds(-r) if we need to read bounds\n\
 --no-bounds(-n) if we don\'t want read bounds (default)\n\
---rewrite(-w) rewrite db\n\
+--rewrite(-w) rewrite db:existed tables dynamic_data, static_data, synchro_data would be dropped\n\
 --read-bad(-x) read also bad values (default false)\n");
                 return 0;
             case 'o':

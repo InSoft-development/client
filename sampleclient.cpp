@@ -344,7 +344,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     char *zErrMsg = 0;
     int rc;
     std::string sql;
-
+    int id = 0;
     while (infile >> kks)
     {
     	UaHistoryReadValueIds         nodesToRead;
@@ -385,7 +385,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                 {
                     failed_kks << kks << "\n";
                 }
-                sql = std::string("INSERT INTO dynamic_data1 (id,t,val,status) VALUES ");
+                sql = std::string("INSERT INTO dynamic_data (id,t,val,status) VALUES ");
 
     			for ( j=0; j<results[i].m_dataValues.length(); j++ )
     			{
@@ -396,8 +396,8 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                     if ( read_bad || OpcUa_IsGood(results[i].m_dataValues[j].StatusCode) )
     				{
     					UaVariant tempValue = results[i].m_dataValues[j].Value;
-                        sql += std::string(" (\'") +
-                                kks + "\' , \'" + sourceTS.c_str() + "\', " +
+                        sql += std::string(" (") +
+                                std::to_string(id) + " , \'" + sourceTS.c_str() + "\', " +
                                 tempValue.toString().toUtf8() + ", \'" +
                                 statusOPLevel.toString().toUtf8() + "\' ),\n";
 
@@ -472,7 +472,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     				{
     					UaStatus nodeResult(results[i].m_status);
                         printf("** ContinuationPoint Results %d Node=%s status=%s length=%d\n", i, nodeToRead.toXmlString().toUtf8(), nodeResult.toString().toUtf8(),results[i].m_dataValues.length());
-                        sql = std::string("INSERT INTO dynamic_data1 (id,t,val,status) VALUES ");
+                        sql = std::string("INSERT INTO dynamic_data (id,t,val,status) VALUES ");
 
                         for ( j=0; j<results[i].m_dataValues.length(); j++ )
     					{
@@ -484,8 +484,8 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     						{
 
                                 UaVariant tempValue = results[i].m_dataValues[j].Value;
-                                sql += std::string(" (\'") +
-                                        kks + "\' , \'" + sourceTS.c_str() + "\', " +
+                                sql += std::string(" (") +
+                                        std::to_string(id) + " , \'" + sourceTS.c_str() + "\', " +
                                         tempValue.toString().toUtf8() + ", \'" +
                                         statusOPLevel.toString().toUtf8() + "\' ),\n";
 
@@ -512,6 +512,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     			}
     		}
     	}
+        id++;
     }
 
     return status;
@@ -841,23 +842,35 @@ void sqlite_database::init_db(std::vector<std::string> kks_array)
                                       std::string(", \"timestamp\" timestamp with time zone NOT NULL );");
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
-        rc = sqlite3_exec(sq_db, sql.c_str(), callback, 0, &zErrMsg);
-        if( rc != SQLITE_OK )
-        {
-            fprintf(stderr, "SQL error: %s\n", zErrMsg);
-            sqlite3_free(zErrMsg);
-        }
+        exec(sql.c_str());
 
-        /* Create SQL statement */
-        sql = std::string("DROP TABLE IF EXISTS dynamic_data; CREATE TABLE dynamic_data1 ( id text, t timestamp without time zone NOT NULL, val real, status text )");
+        sql = std::string("DROP TABLE IF EXISTS static_data;");
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
-        rc = sqlite3_exec(sq_db, sql.c_str(), callback, 0, &zErrMsg);
-        if( rc != SQLITE_OK )
+        exec(sql.c_str());
+        sql = std::string("CREATE TABLE static_data ( id int, name text, description text);");
+        printf("%s\n",sql.c_str());
+        /* Execute SQL statement */
+        exec(sql.c_str());
+
+        sql = std::string("INSERT INTO static_data (id,name) VALUES ");
+        int i = 0;
+        for (auto k : kks_array)
         {
-            fprintf(stderr, "SQL error: %s\n", zErrMsg);
-            sqlite3_free(zErrMsg);
+            sql += "(" + std::to_string(i) + ", \'" + k + "\'),\n";
+            i++;
         }
+        sql.pop_back();
+        sql.pop_back();
+        sql += ";";
+        printf("%s\n",sql.c_str());
+        exec( sql.c_str());
+
+        /* Create SQL statement */
+        sql = std::string("DROP TABLE IF EXISTS dynamic_data; CREATE TABLE dynamic_data ( id int, t timestamp without time zone NOT NULL, val real, status text )");
+        printf("%s\n",sql.c_str());
+        /* Execute SQL statement */
+        exec(sql.c_str());
     }
 
 }
@@ -905,11 +918,11 @@ void clickhouse_database::init_db(std::vector<std::string> kks_array)
         if (!kks_string.empty())
             kks_string.erase(kks_string.size()-3);
 
-        std::string sql = std::string("DROP TABLE IF EXISTS synchro_data1;");
+        std::string sql = std::string("DROP TABLE IF EXISTS synchro_data;");
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
         exec(sql.c_str());
-        sql = std::string("CREATE TABLE synchro_data1 ( \"") + kks_string +
+        sql = std::string("CREATE TABLE synchro_data ( \"") + kks_string +
                                       std::string(", \"timestamp\" DateTime64(3,'Europe/Moscow') ) "
                                                   " ENGINE = MergeTree() PARTITION BY toYYYYMM(timestamp)"
                                                   " ORDER BY (timestamp) PRIMARY KEY (timestamp)");
@@ -917,14 +930,38 @@ void clickhouse_database::init_db(std::vector<std::string> kks_array)
         /* Execute SQL statement */
         exec(sql.c_str());
 
+        sql = std::string("DROP TABLE IF EXISTS static_data;");
+        printf("%s\n",sql.c_str());
+        /* Execute SQL statement */
+        exec(sql.c_str());
+        sql = std::string("CREATE TABLE static_data ( id UInt64, name text, description text ) "
+                                                  " ENGINE = MergeTree() PARTITION BY id"
+                                                  " ORDER BY (id) PRIMARY KEY (id)");
+        printf("%s\n",sql.c_str());
+        /* Execute SQL statement */
+        exec(sql.c_str());
+
+        sql = std::string("INSERT INTO static_data (id,name) VALUES ");
+        int i = 0;
+        for (auto k : kks_array)
+        {
+            sql += "(" + std::to_string(i) + ", \'" + k + "\'),\n";
+            i++;
+        }
+        sql.pop_back();
+        sql.pop_back();
+        sql += ";";
+        printf("%s\n",sql.c_str());
+        exec( sql.c_str());
+
 
         /* Create SQL statement */
-        sql = std::string("DROP TABLE IF EXISTS dynamic_data1;");
+        sql = std::string("DROP TABLE IF EXISTS dynamic_data;");
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
         exec(sql.c_str());
         /* Create SQL statement */
-        sql = std::string("CREATE TABLE dynamic_data1 ( id text, t DateTime64(3,'Europe/Moscow'), "
+        sql = std::string("CREATE TABLE dynamic_data ( id UInt64, t DateTime64(3,'Europe/Moscow'), "
                           "val Float64, status text ) ENGINE = MergeTree()"
                           " PARTITION BY toYYYYMM(t) ORDER BY (t) PRIMARY KEY (t)");
         printf("%s\n",sql.c_str());
