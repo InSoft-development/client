@@ -63,24 +63,24 @@ SampleClient::SampleClient(int d, int m, int n = 1, bool r=false, bool b=false, 
     read_bad = b;
     if (c !="" && f !="")\
     {
-        printf("Can not use clickhouse and csv together");
+        printf("Can not use clickhouse and csv together\n");
         exit(1);
     }
     if (c == "" && f == "")
     {
-        printf("using local data.sqlite");
+        //printf("using local data.sqlite\n");
         db = new sqlite_database(r);
-        init_db();
+
     }
     else if (c != "")
     {
-        printf("using clickhouse database");
+        //printf("using clickhouse database\n");
         db = new clickhouse_database(r, c.c_str());
-        init_db();
+
     }
     else if (f != "")
     {
-        printf("using local %s csv file", f.c_str());
+        //printf("using local %s csv file\n", f.c_str());
         csv_fstream.open(f);
         csv_fstream<<"id, timestamp, value, code\n";
     }
@@ -262,7 +262,10 @@ UaStatus SampleClient::read()
     kks_string += "\'timestamp\'";
 
     if (db)
+    {
+        db->init_db(kks_array);
         db->init_synchro(kks_array);
+    }
     else
         csv_fstream<<kks_string<<"\n";
 
@@ -346,6 +349,7 @@ UaStatus SampleClient::read()
 
 UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, int timeout, bool read_bounds)
 {
+    init_db();
     //std::ofstream data ("data.csv");
     //data<<"kks;value;timestamp;status\n";
     UaStatus                      status;
@@ -403,7 +407,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
         if ( status.isNotGood() )
     	{
             fprintf(stderr, "** Error: %s UaSession::historyReadRawModified failed [ret=%s]\n", kks.c_str(), status.toString().toUtf8());
-    		failed_kks << kks << "\n";
+            failed_kks << kks << " " << status.toString().toUtf8() << "\n";
     		continue;//return status;
     	}
     	else
@@ -415,14 +419,14 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                     continue;
                 if (std::string(UaVariant(results[i].m_dataValues[0].Value).toString().toUtf8()).find_first_not_of("0123456789.,-") != std::string::npos)
                 {
-                    failed_kks << kks << "\n";
+                    failed_kks << kks << " text field \n";
                     continue;
                 }
     			UaStatus nodeResult(results[i].m_status);
                 printf("** id %d Results %d Node=%s status=%s  length=%d\n",id, i, nodeToRead.toXmlString().toUtf8(), nodeResult.toString().toUtf8(), results[i].m_dataValues.length());
                 if ( nodeResult.isNotGood() )
                 {
-                    failed_kks << kks << "\n";
+                    failed_kks << kks << " " << status.toString().toUtf8() << "\n";
                 }
                 sql = std::string("INSERT INTO dynamic_data (id,t,val,status) VALUES ");
 
@@ -512,7 +516,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     			if ( status.isBad() )
     			{
                     fprintf(stderr, "** Error: %s UaSession::historyReadRawModified with CP failed [ret=%s]\n", kks.c_str(), status.toString().toUtf8());
-    				failed_kks << kks << "\n";
+                    failed_kks << kks << " " << status.toString().toUtf8() << "\n";
     				break;//return status;
     			}
     			else
