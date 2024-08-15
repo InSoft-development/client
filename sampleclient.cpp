@@ -53,23 +53,38 @@ void signalHandler_for_browse(int signum)
        }
 }
 
-SampleClient::SampleClient(int d, int m, int n = 1, bool r=false, bool b=false, std::string c = "")
+SampleClient::SampleClient(int d, int m, int n = 1, bool r=false, bool b=false, std::string c = "",std::string f = "")
 {
     m_pSession = new UaSession();
-    db = NULL;
+    db = nullptr;
     delta = d;
     mean = m;
     ns = n;
     read_bad = b;
-    if (c == ""){
-        printf("empty\n\n");
-
-        db = new sqlite_database(r);}
-    else
+    if (c !="" && f !="")\
+    {
+        printf("Can not use clickhouse and csv together");
+        exit(1);
+    }
+    if (c == "" && f == "")
+    {
+        printf("using local data.sqlite");
+        db = new sqlite_database(r);
+        init_db();
+    }
+    else if (c != "")
+    {
+        printf("using clickhouse database");
         db = new clickhouse_database(r, c.c_str());
+        init_db();
+    }
+    else if (f != "")
+    {
+        printf("using local %s csv file", f.c_str());
+        csv_fstream.open(f);
+        csv_fstream<<"id, timestamp, value, code\n";
+    }
     m_pSampleSubscription = new SampleSubscription(delta);
-
-    init_db();
 }
 
 SampleClient::~SampleClient()
@@ -94,6 +109,10 @@ SampleClient::~SampleClient()
         std::cout<<"Close DB\n";
         delete db;
         std::cout<<"DB Closed\n";
+    }
+    if  (csv_fstream.is_open())
+    {
+        csv_fstream.close();
     }
 }
 
@@ -234,6 +253,20 @@ UaStatus SampleClient::read()
     UaDataValues      values;
     UaDiagnosticInfos diagnosticInfos;
     int item_index = 0;
+
+    std::string kks_string;
+    for (auto k : kks_array)
+    {
+        kks_string += "\'" + k + "\',";
+    }
+    kks_string += "\'timestamp\'";
+
+    if (db)
+        db->init_synchro(kks_array);
+    else
+        csv_fstream<<kks_string<<"\n";
+
+
     for (auto kks : kks_array)
     {
 
@@ -281,25 +314,26 @@ UaStatus SampleClient::read()
 
     if (iteration_count == mean-1 )
     {
-        std::string kks_string;
+
         std::string value_string;
         for (auto k : kks_array)
         {
-            kks_string += "\"" + k + "\",";
             if (slice_data[k].size())
                 value_string += std::to_string(std::accumulate(slice_data[k].begin(), slice_data[k].end(), 0.0)/ slice_data[k].size()) + ",";
             else
                 value_string += "null,";
         }
-        kks_string += "\"timestamp\"";
         value_string += "CURRENT_TIMESTAMP";
 
         std::string sql = std::string("INSERT INTO synchro_data ( ") + kks_string + ") VALUES(" +
                 value_string + ");";
         std::cout<< "\n SQL:\n" << sql<< "\n";
         /* Execute SQL statement */
-        char *zErrMsg = NULL;
-        db->exec(sql.c_str());
+        if (db)
+            db->exec(sql.c_str());
+        else
+            csv_fstream<<value_string<<"\n";
+
 
         iteration_count = 0;
 
@@ -341,8 +375,6 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     int item_index = 0;
     std::string kks;
 
-    char *zErrMsg = 0;
-    int rc;
     std::string sql;
     int id = 0;
     while (infile >> kks)
@@ -380,7 +412,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     		for ( i=0; i<results.length(); i++ )
     		{
     			UaStatus nodeResult(results[i].m_status);
-                printf("** Results %d Node=%s status=%s  length=%d\n", i, nodeToRead.toXmlString().toUtf8(), nodeResult.toString().toUtf8(), results[i].m_dataValues.length());
+                printf("** id %d Results %d Node=%s status=%s  length=%d\n",id, i, nodeToRead.toXmlString().toUtf8(), nodeResult.toString().toUtf8(), results[i].m_dataValues.length());
                 if ( nodeResult.isNotGood() )
                 {
                     failed_kks << kks << "\n";
@@ -396,10 +428,16 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                     if ( read_bad || OpcUa_IsGood(results[i].m_dataValues[j].StatusCode) )
     				{
     					UaVariant tempValue = results[i].m_dataValues[j].Value;
-                        sql += std::string(" (") +
+                        if (!db) // using local csv file
+                            csv_fstream<<kks<<" , \'"<<sourceTS.c_str()<<"\'," <<
+                                         tempValue.toString().toUtf8() << ", \'" <<
+                                         statusOPLevel.toString().toUtf8()<<"\n";
+                        else
+                            sql += std::string(" (") +
                                 std::to_string(id) + " , \'" + sourceTS.c_str() + "\', " +
                                 tempValue.toString().toUtf8() + ", \'" +
                                 statusOPLevel.toString().toUtf8() + "\' ),\n";
+
 
                     }
 //    				else
@@ -417,8 +455,13 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                 sql += ";";
                 if (j>0)
                 {
-                    printf("1: %s\n", sql.c_str());
-                    db->exec( sql.c_str());
+                    if (db)
+                    {
+                        //printf("1: %s\n", sql.c_str());
+                        db->exec( sql.c_str());
+                    }
+                    else
+                        csv_fstream.flush();
                 }
 
 
@@ -471,7 +514,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     				for ( i=0; i<results.length(); i++ )
     				{
     					UaStatus nodeResult(results[i].m_status);
-                        printf("** ContinuationPoint Results %d Node=%s status=%s length=%d\n", i, nodeToRead.toXmlString().toUtf8(), nodeResult.toString().toUtf8(),results[i].m_dataValues.length());
+                        printf("** ContinuationPoint id %d Results %d Node=%s status=%s length=%d\n", id, i, nodeToRead.toXmlString().toUtf8(), nodeResult.toString().toUtf8(),results[i].m_dataValues.length());
                         sql = std::string("INSERT INTO dynamic_data (id,t,val,status) VALUES ");
 
                         for ( j=0; j<results[i].m_dataValues.length(); j++ )
@@ -484,7 +527,12 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     						{
 
                                 UaVariant tempValue = results[i].m_dataValues[j].Value;
-                                sql += std::string(" (") +
+                                if (!db) // using local csv file
+                                    csv_fstream<<kks<<" , \'"<<sourceTS.c_str()<<"\'," <<
+                                                 tempValue.toString().toUtf8() << ", \'" <<
+                                                 statusOPLevel.toString().toUtf8()<<"\n";
+                                else
+                                    sql += std::string(" (") +
                                         std::to_string(id) + " , \'" + sourceTS.c_str() + "\', " +
                                         tempValue.toString().toUtf8() + ", \'" +
                                         statusOPLevel.toString().toUtf8() + "\' ),\n";
@@ -504,8 +552,14 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                         sql += ";";
                         if (j>0)
                         {
-                            printf("2: %s\n", sql.c_str());
-                            db->exec( sql.c_str());
+
+                            if (db)
+                            {
+                                //printf("2: %s\n", sql.c_str());
+                                db->exec( sql.c_str());
+                            }
+                            else
+                                csv_fstream.flush();
                         }
 
     				}
@@ -821,11 +875,32 @@ sqlite_database::~sqlite_database()
     sqlite3_close(sq_db);
 }
 
+void sqlite_database::init_synchro(std::vector<std::string> kks_array)
+{
+    printf("init sqlite tables\n");
+    if (rewrite)
+    {
+        /* Create SQL statement */
+        std::string kks_string;
+        for (auto k : kks_array)
+        {
+            kks_string += k;
+            kks_string += "\" real, \"";
+        }
+        if (!kks_string.empty())
+            kks_string.erase(kks_string.size()-3);
+
+        std::string sql = std::string("DROP TABLE IF EXISTS synchro_data; CREATE TABLE synchro_data ( \"") + kks_string +
+                                      std::string(", \"timestamp\" timestamp with time zone NOT NULL );");
+        printf("%s\n",sql.c_str());
+        /* Execute SQL statement */
+        exec(sql.c_str());
+    }
+}
+
 void sqlite_database::init_db(std::vector<std::string> kks_array)
 {
     printf("init sqlite tables\n");
-    char *zErrMsg = 0;
-    int rc;
     if (rewrite)
     {
         /* Create SQL statement */
@@ -903,7 +978,7 @@ clickhouse_database::~clickhouse_database()
     delete ch_db;
 }
 
-void clickhouse_database::init_db(std::vector<std::string> kks_array)
+void clickhouse_database::init_synchro(std::vector<std::string> kks_array)
 {
     printf("init clickhouse tables\n");
     if (rewrite)
@@ -929,8 +1004,17 @@ void clickhouse_database::init_db(std::vector<std::string> kks_array)
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
         exec(sql.c_str());
+    }
+}
 
-        sql = std::string("DROP TABLE IF EXISTS static_data;");
+void clickhouse_database::init_db(std::vector<std::string> kks_array)
+{
+    printf("init clickhouse tables\n");
+    if (rewrite)
+    {
+        init_synchro(kks_array);
+
+        std::string  sql = std::string("DROP TABLE IF EXISTS static_data;");
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
         exec(sql.c_str());

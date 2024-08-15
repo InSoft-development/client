@@ -47,6 +47,7 @@ public:
     virtual void init_db(std::vector<std::string>) = 0;
     virtual int exec(const char*) = 0;
     virtual ~database(){};
+    virtual void init_synchro(std::vector<std::string>) = 0;
 };
 
 class sqlite_database : public database
@@ -56,6 +57,7 @@ public:
     void init_db(std::vector<std::string>);
     int exec(const char*);
     ~sqlite_database();
+    void init_synchro(std::vector<std::string>);
 private:
     sqlite3 *sq_db;
 };
@@ -67,6 +69,7 @@ public:
     void init_db(std::vector<std::string>);
     int exec(const char*);
     ~clickhouse_database();
+    void init_synchro(std::vector<std::string>);
 private:
     clickhouse::Client* ch_db;
 };
@@ -75,7 +78,7 @@ class SampleClient : public UaSessionCallback
 {
     UA_DISABLE_COPY(SampleClient);
 public:
-    SampleClient(int,int,int,bool,bool,std::string);
+    SampleClient(int,int,int,bool,bool,std::string,std::string);
     virtual ~SampleClient();
 
     // UaSessionCallback implementation ----------------------------------------------------
@@ -106,6 +109,7 @@ private:
     std::vector<std::string> kks_array;
     std::ofstream kks_fstream;
     database* db;
+    std::ofstream csv_fstream;
     void init_db();
 };
 

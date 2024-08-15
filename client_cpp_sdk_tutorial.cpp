@@ -76,6 +76,7 @@ int main(int argc, char*argv[])
 	{
             {"online",0,NULL,'o'},
             {"clickhouse-server",0, NULL,'u'},
+            {"csv-file",0, NULL,'f'},
             {"history",0,NULL,'i'},
             {"delta", 0, NULL,'d'},
             {"mean", 0, NULL,'m'},
@@ -108,9 +109,10 @@ int main(int argc, char*argv[])
     std::string kks = "";
     bool recursive = false;
     std::string clickhouse = "";
+    std::string csv_file = "";
 	// loop over all of the options
 	int ch;
-    while ((ch = getopt_long(argc, argv, "hou:d:m:s:b:e:p:t:rnwxk:ic", long_options, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "hou:f:d:m:s:b:e:p:t:rnwxk:ic", long_options, NULL)) != -1)
 	{
 	    // check to see if a single character or long option came through
 	    switch (ch)
@@ -119,6 +121,7 @@ int main(int argc, char*argv[])
 	    		 printf("read data from OPC UA\noptions:\n\
 --help(-h) this info\n\
 --clickhouse-server (-u) clickhouse server ip (table dynamic_data and static_data would be used)\n\
+--csv-file (-f) store result in local csv file\n\
 --ns(-s) number of space (1 by default)\n\
 --kks(-k) <id> kks browse mode \n\
                  list subobjects from <id> object, strings, values, variables etc. \n\
@@ -148,6 +151,10 @@ HISTORY MODE:\n\
             case 'u':
                 clickhouse = optarg;
                 printf("clickhouse_server %s, ", clickhouse.c_str());
+                break;
+            case 'f':
+                csv_file = optarg;
+                printf("csv_file %s, ", clickhouse.c_str());
                 break;
             case 'd':
                 delta = atoi(optarg);
@@ -255,7 +262,7 @@ HISTORY MODE:\n\
     UaPlatformLayer::init();
 
     // Create instance of SampleClient
-    pMyClient = new SampleClient(delta,mean,ns,rewrite,read_bad,clickhouse);
+    pMyClient = new SampleClient(delta,mean,ns,rewrite,read_bad,clickhouse,csv_file);
 
     // Connect to OPC UA Server
     status_run = pMyClient->connect();
