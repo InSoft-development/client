@@ -1,73 +1,40 @@
-# client
+# client library for work with OPC UA data
 
-c++ client for online data receiving from OpcUA and history access
+* client_lesson02 - a c++ client for online data receiving from OpcUA and history access
+* slicer.py - transform raw historical data from timeseries VQT format
+into slices
+* clickhouse_fill.py - send data from slices.csv to clickhouse
+* clickhouse_play.py - play data from table slices to table slices_play, as an emulation of working stand, accelerated 60 times (each 5 seconds instead 5 minutes)
+* last_row.py - example of receiving data from clickhouse in online mode
 
-slicer for transform raw historical data from timeseries format into slices
+## client - read data from OPC UA
 
-for now - using local data.sqlite
-
-clickhouse_fill.py - send data from slices.csv to clickhouse
-
-clickhouse_play.py - play data from table slices to table slices_play, as an emulation of working stand, accelerated 60 times (each 5 seconds instead 5 minutes)
-
-last_row.py - example of receiving data from clickhouse in online mode
-
-client - read data from OPC UA
-
-options:
-
---help(-h) this info
-
---ns(-s) number of space (1 by default)
-
---kks(-k) <id> kks browse mode 
-                 list subobjects from <id> object, strings, values, variables etc.
-                 all - from root folder,
-                 begin - from begin of object folder
-
---recursive (-c) read tags recursively from all objects subobjects
-
---online(-o) online mode 
-
---history(-i) history mode (default)
-
-ONLINE:
-
---delta(-d) miliseconds between reading from OPC UA, default 1000
-
---mean(-m) count of averaging: 1 means we don't calculate average and send each slice to DB, 5 - we calculate 5 slices to one mean and send it to DB. default 5
-
-HISTORY MODE:
-
---begin(-b) <timestamp> in YYYY-MM-DDTHH:MM:SS.MMMZ format (e.g. 2021-06-01T00:00:00.000Z
-
---end(-e) <timestramp>
-
---pause(-p) <miliseconds> pause between requests
-
---timeout(-t) <ms> maximum timeout, that we are waiting for response from server
-
---read-bounds(-r) if we need to read bounds
-
---no-bounds(-n) if we don't want read bounds (default)
-
---rewrite(-w) rewrite db
-
---read-bad(-x) read also bad values (default false)
-
+options can be observed using option --help(-h). For working we need file server.conf wit ip to opc ua server and kks.csv with list of tags
 
 examples:
 
 historical access:
 
-./client -b 2021-06-01T00:00:00Z -e 2022-10-30T00:00:10Z -p 100 -t 10000
+this example would read all data between timestamps and send it to 
+clickhouse database in "VQT" format into table dynamic_data. 
+Also table "static_data" would be formed. Then, using slicer, 
+we would transform data in clickhouse database: from table 
+"dynamic_data" in VQT format - to slices into local csv file or table "synchro_data".
+We can use multiple options: from clickhouse or sqlite -
+to another clickhouse or sqlite, or csv.
 
-./slicer.py -t "2021-06-01" "2022-10-31"
+./client_lesson02 -b 2021-06-01T00:00:00Z -e 2021-07-01T00:00:00Z -p 100 -t 10000 -u "10.23.23.32" -w
+
+./slicer.py -t "2021-06-01" "2021-07-01 00:00:00" -i "10.23.23.32" -o slices.csv
 
 online opc ua data access:
 
-./client -o
+would retrieve actual data for tags, listed in kks.csv. With delta 100 miliseconds, and averaging for ten times (actually we would read every 10 milliseconds - and then calculate mean for ten values)
+
+./client -o -d 100 -m 10
 
 kks browsing:
 
-./client -k 00_Блок_2.01_Сочинская_ТЭС_блок_2.20BAC10GS001-MR -c
+Would recursively give all tags with there subtags for 1_Сочинская_ТЭС_блок_2 
+
+./client -k 00_Блок_2.01_Сочинская_ТЭС_блок_2 -c

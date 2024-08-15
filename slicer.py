@@ -11,17 +11,23 @@ import traces as tr
 import numba
 import sqlite3
 import dateutil.parser
+import clickhouse_connect
+import re
+import pytz
+
+
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="dump slices of data from archive")
+    parser = argparse.ArgumentParser(description="convert (id,timestamp,value) format to slices")
     parser.add_argument("--delta", "-d", type=int, help="delta between slices in miliseconds (default 60 sec)", default=60000)
     parser.add_argument("--interval", "--time", "-t", nargs=2, required=True, type=str,
                         help="two timestamps, period, format \"YYY-MM-DD HH:MM:SS.SSS\" \"YYY-MM-DD HH:MM:SS.SSS\"" )
     parser.add_argument("--output", "-o", default="slices.csv", type=str,
-                        help="output file")
+                        help="output:csv file, sqlite file or clickhouse ip. In sqlite - table synchro_data would"
+                             " be dropped. In clickhouse - no drop, append with new data")
     parser.add_argument("--input", "-i", default="data.sqlite", type=str,
-                        help="input file")
+                        help="input: sqlite file or clickhouse ip. Tables dynamic_data and static_data would be used")
 
     return parser.parse_args()
 
@@ -59,13 +65,40 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
     # delta = datetime.timedelta(seconds=args.delta)
-    outfile = args.output
-    infile = args.input
-    print(args)
-    # открыть ккс.цсв, считать датчики
+    pattern = re.compile("([0-9]{1,3}[\.]){3}[0-9]{1,3}")
+
+    if args.input[-6:] == "sqlite":
+        in_format = "sqlite"
+        infile = args.input
+        conn_raw_in = sqlite3.connect(infile)
+    elif args.input == "localhost" or pattern.match(args.input):
+        in_format = "clickhouse"
+        client_in = clickhouse_connect.get_client(host=args.input, username='default', password='asdf')
+    else:
+        print("unknown in format: clickhouse or sqlite available")
+        exit(1)
+
+    if args.output[-3:] == "csv":
+        outfile = args.output
+        out_format = "csv"
+    if args.output[-6:] == "sqlite":
+        out_format = "sqlite"
+        outfile = args.output
+        conn_raw_out = sqlite3.connect(outfile)
+    elif args.output == "localhost" or pattern.match(args.input):
+        out_format = "clickhouse"
+        client_out = clickhouse_connect.get_client(host=args.output, username='default', password='asdf')
+    else:
+        print("unknown out format: clickhouse, sqlite or csv available")
+        exit(1)
+
+    print("\nin: "+in_format)
+    print("\nout: " + out_format)
+
     nums = pd.read_csv("kks.csv", header=None)[0].to_list()  # ["20MAD11CY004"] #
     start_date = dateutil.parser.parse(args.interval[0])  # datetime.datetime(2021, 6, 1)
     end_date = dateutil.parser.parse(args.interval[1])  # datetime.datetime(2022, 10, 30)
+
     delta = args.delta 
     # загрузить датафрейм из цсв
     # start_time = time.time()
@@ -126,12 +159,18 @@ if __name__ == '__main__':
     start_time = time.time()
     for kks in nums:
         print(kks)
-        conn_raw = sqlite3.connect(infile)
-        sql = ("SELECT t as timestamp,val as value FROM dynamic_data WHERE id=\"" +
-               kks + "\" and t > \"" + args.interval[0]+ "\" and t < \"" +
-               args.interval[1]  + "\"")
+
+        sql = ("SELECT t as timestamp,val as value FROM "
+               "dynamic_data JOIN static_data ON static_data.id=dynamic_data.id WHERE name=\'" +
+               kks + "\' and t > \'" + args.interval[0]+ "\' and t < \'" +
+               args.interval[1] + "\'")
         print(sql)
-        data_column = pd.read_sql(sql, conn_raw,parse_dates=['timestamp'])
+        if in_format == "sqlite":
+            data_column = pd.read_sql(sql, conn_raw_in,parse_dates=['timestamp'])
+        elif in_format == "clickhouse":
+            data_column = client_in.query_df(sql)
+            start_date = start_date.replace(tzinfo=pytz.UTC)
+            end_date = end_date.replace(tzinfo=pytz.UTC)
         if len(data_column) == 0:
             print("missing data!!")
             data_column = pd.DataFrame([{"timestamp": start_date, "value": 0},
@@ -161,7 +200,13 @@ if __name__ == '__main__':
     # slices.to_csv("slices_vib.csv")
     # means.to_csv("mean_slices_vib.csv")
     # slices_1.to_csv("slices_GT1m.csv")
-    slices_5mean.to_csv(outfile,index=False)
+    if out_format == "csv":
+        slices_5mean.to_csv(outfile,index=False)
+    elif out_format == "clickhouse":
+        client_out.insert_df('synchro_data', slices_5mean)
+    elif out_format == "sqlite":
+        conn_raw_out.execute("DROP TABLE IF EXISTS synchro_data")
+        slices_5mean.to_sql('synchro_data', conn_raw_out)
 
     # slices_5mean.plot(x="timestamp")
 

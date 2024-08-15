@@ -829,22 +829,22 @@ void sqlite_database::init_db(std::vector<std::string> kks_array)
     if (rewrite)
     {
         /* Create SQL statement */
-        std::string kks_string;
-        for (auto k : kks_array)
-        {
-            kks_string += k;
-            kks_string += "\" real, \"";
-        }
-        if (!kks_string.empty())
-            kks_string.erase(kks_string.size()-3);
+//        std::string kks_string;
+//        for (auto k : kks_array)
+//        {
+//            kks_string += k;
+//            kks_string += "\" real, \"";
+//        }
+//        if (!kks_string.empty())
+//            kks_string.erase(kks_string.size()-3);
 
-        std::string sql = std::string("DROP TABLE IF EXISTS synchro_data; CREATE TABLE synchro_data ( \"") + kks_string +
-                                      std::string(", \"timestamp\" timestamp with time zone NOT NULL );");
-        printf("%s\n",sql.c_str());
-        /* Execute SQL statement */
-        exec(sql.c_str());
+//        std::string sql = std::string("DROP TABLE IF EXISTS synchro_data; CREATE TABLE synchro_data ( \"") + kks_string +
+//                                      std::string(", \"timestamp\" timestamp with time zone NOT NULL );");
+//        printf("%s\n",sql.c_str());
+//        /* Execute SQL statement */
+//        exec(sql.c_str());
 
-        sql = std::string("DROP TABLE IF EXISTS static_data;");
+        std::string  sql = std::string("DROP TABLE IF EXISTS static_data;");
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
         exec(sql.c_str());
