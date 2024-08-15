@@ -411,6 +411,13 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     		OpcUa_UInt32 i, j;
     		for ( i=0; i<results.length(); i++ )
     		{
+                if (results[i].m_dataValues.length() ==0)
+                    continue;
+                if (std::string(UaVariant(results[i].m_dataValues[0].Value).toString().toUtf8()).find_first_not_of("0123456789.,-") != std::string::npos)
+                {
+                    failed_kks << kks << "\n";
+                    continue;
+                }
     			UaStatus nodeResult(results[i].m_status);
                 printf("** id %d Results %d Node=%s status=%s  length=%d\n",id, i, nodeToRead.toXmlString().toUtf8(), nodeResult.toString().toUtf8(), results[i].m_dataValues.length());
                 if ( nodeResult.isNotGood() )
@@ -427,11 +434,11 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     				sourceTS[10] = ' ';
                     if ( read_bad || OpcUa_IsGood(results[i].m_dataValues[j].StatusCode) )
     				{
-    					UaVariant tempValue = results[i].m_dataValues[j].Value;
+                        UaVariant tempValue = results[i].m_dataValues[j].Value;
                         if (!db) // using local csv file
                             csv_fstream<<kks<<" , \'"<<sourceTS.c_str()<<"\'," <<
                                          tempValue.toString().toUtf8() << ", \'" <<
-                                         statusOPLevel.toString().toUtf8()<<"\n";
+                                         statusOPLevel.toString().toUtf8()<<"'\n";
                         else
                             sql += std::string(" (") +
                                 std::to_string(id) + " , \'" + sourceTS.c_str() + "\', " +
@@ -530,7 +537,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                                 if (!db) // using local csv file
                                     csv_fstream<<kks<<" , \'"<<sourceTS.c_str()<<"\'," <<
                                                  tempValue.toString().toUtf8() << ", \'" <<
-                                                 statusOPLevel.toString().toUtf8()<<"\n";
+                                                 statusOPLevel.toString().toUtf8()<<"'\n";
                                 else
                                     sql += std::string(" (") +
                                         std::to_string(id) + " , \'" + sourceTS.c_str() + "\', " +
