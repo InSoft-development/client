@@ -50,6 +50,7 @@ void signalHandler(int signum)
 //           }
            if (pMyClient)
            {
+               pMyClient->disconnect();
                delete pMyClient;
                pMyClient = NULL;
            }

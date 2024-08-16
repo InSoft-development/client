@@ -96,7 +96,7 @@ SampleClient::~SampleClient()
         m_pSampleSubscription = NULL;
     }
 
-    if (m_pSession)
+    if (m_pSession->isConnected() == OpcUa_True)
     {
         // disconnect if we're still connected
         disconnect();
@@ -594,6 +594,11 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     	}
         id++;
     }
+    if (db)
+    {
+        printf("\ncreating index\n");
+        db->exec("REINDEX");
+    }
 
     return status;
 
@@ -898,8 +903,6 @@ sqlite_database::sqlite_database(bool r)
 
 sqlite_database::~sqlite_database()
 {
-    printf("\ncreating index and closing SQlite\n");
-    exec("CREATE INDEX \"idd\" ON \"dynamic_data\"(\"id\"  ASC)");
     sqlite3_close(sq_db);
 }
 
@@ -977,6 +980,7 @@ void sqlite_database::init_db(std::vector<std::string> kks_array)
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
         exec(sql.c_str());
+        exec("CREATE INDEX IF NOT EXISTS \"idd\" ON \"dynamic_data\"(\"id\"  ASC)");
     }
 
 }
