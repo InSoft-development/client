@@ -349,7 +349,8 @@ UaStatus SampleClient::read()
 
 UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, int timeout, bool read_bounds)
 {
-    init_db();
+    if (db)
+        init_db();
     //std::ofstream data ("data.csv");
     //data<<"kks;value;timestamp;status\n";
     UaStatus                      status;
@@ -417,7 +418,9 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     		{
                 if (results[i].m_dataValues.length() ==0)
                     continue;
-                if (std::string(UaVariant(results[i].m_dataValues[0].Value).toString().toUtf8()).find_first_not_of("0123456789.,-") != std::string::npos)
+                std::string first_value = (UaVariant(results[i].m_dataValues[0].Value).toString().toUtf8());
+                if (first_value.find_first_not_of("0123456789.,-") != std::string::npos &&
+                        first_value != "true" && first_value != "false")
                 {
                     failed_kks << kks << " text field \n";
                     continue;
@@ -438,16 +441,21 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     				sourceTS[10] = ' ';
                     if ( read_bad || OpcUa_IsGood(results[i].m_dataValues[j].StatusCode) )
     				{
-                        UaVariant tempValue = results[i].m_dataValues[j].Value;
+                        std::string value = UaVariant(results[i].m_dataValues[j].Value).toString().toUtf8();
                         if (!db) // using local csv file
-                            csv_fstream<<kks<<" , \'"<<sourceTS.c_str()<<"\'," <<
-                                         tempValue.toString().toUtf8() << ", \'" <<
+                            csv_fstream<<kks<<","<<sourceTS.c_str()<<"," <<
+                                         value << ",\'" <<
                                          statusOPLevel.toString().toUtf8()<<"'\n";
                         else
+                        {
+                            if (value == "true") value = "1";
+                            if (value == "false") value = "0";
+
                             sql += std::string(" (") +
-                                std::to_string(id) + " , \'" + sourceTS.c_str() + "\', " +
-                                tempValue.toString().toUtf8() + ", \'" +
+                                std::to_string(id) + " , \'" + sourceTS + "\', " +
+                                value + ", \'" +
                                 statusOPLevel.toString().toUtf8() + "\' ),\n";
+                        }
 
 
                     }
@@ -468,7 +476,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                 {
                     if (db)
                     {
-                        //printf("1: %s\n", sql.c_str());
+//                        printf("1: %s\n", sql.c_str());
                         db->exec( sql.c_str());
                     }
                     else
@@ -537,16 +545,23 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                             if ( read_bad || OpcUa_IsGood(results[i].m_dataValues[j].StatusCode) )
     						{
 
-                                UaVariant tempValue = results[i].m_dataValues[j].Value;
+                                std::string value = UaVariant(results[i].m_dataValues[j].Value).toString().toUtf8();
                                 if (!db) // using local csv file
-                                    csv_fstream<<kks<<" , \'"<<sourceTS.c_str()<<"\'," <<
-                                                 tempValue.toString().toUtf8() << ", \'" <<
+                                    csv_fstream<<kks<<","<<sourceTS.c_str()<<"," <<
+                                                 value << ",\'" <<
                                                  statusOPLevel.toString().toUtf8()<<"'\n";
                                 else
+                                {
+                                    if (value == "true") value = "1";
+                                    if (value == "false") value = "0";
+
                                     sql += std::string(" (") +
-                                        std::to_string(id) + " , \'" + sourceTS.c_str() + "\', " +
-                                        tempValue.toString().toUtf8() + ", \'" +
+                                        std::to_string(id) + " , \'" + sourceTS + "\', " +
+                                        value + ", \'" +
                                         statusOPLevel.toString().toUtf8() + "\' ),\n";
+                                }
+
+
 
                             }
 //    						else
@@ -566,7 +581,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
 
                             if (db)
                             {
-                                //printf("2: %s\n", sql.c_str());
+//                                printf("2: %s\n", sql.c_str());
                                 db->exec( sql.c_str());
                             }
                             else
@@ -883,6 +898,8 @@ sqlite_database::sqlite_database(bool r)
 
 sqlite_database::~sqlite_database()
 {
+    printf("\ncreating index and closing SQlite\n");
+    exec("CREATE INDEX \"idd\" ON \"dynamic_data\"(\"id\"  ASC)");
     sqlite3_close(sq_db);
 }
 
@@ -934,7 +951,7 @@ void sqlite_database::init_db(std::vector<std::string> kks_array)
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
         exec(sql.c_str());
-        sql = std::string("CREATE TABLE static_data ( id int, name text, description text);");
+        sql = std::string("CREATE TABLE static_data ( id int, name text, description text, PRIMARY KEY(\"id\"));");
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
         exec(sql.c_str());
@@ -953,7 +970,10 @@ void sqlite_database::init_db(std::vector<std::string> kks_array)
         exec( sql.c_str());
 
         /* Create SQL statement */
-        sql = std::string("DROP TABLE IF EXISTS dynamic_data; CREATE TABLE dynamic_data ( id int, t timestamp without time zone NOT NULL, val real, status text )");
+        sql = std::string("DROP TABLE IF EXISTS dynamic_data; "
+                          "CREATE TABLE dynamic_data ( id int, t timestamp without time zone NOT NULL,"
+                          " val real, status text, FOREIGN KEY(id) REFERENCES static_data(id) )");
+
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
         exec(sql.c_str());
