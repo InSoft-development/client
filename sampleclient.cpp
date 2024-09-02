@@ -170,14 +170,18 @@ void SampleClient::connectionStatusChanged(
     printf("-------------------------------------------------------------\n");
 }
 
-UaStatus SampleClient::connect()
+UaStatus SampleClient::connect(std::string server_opt)
 {
     UaStatus result;
-
-    // For now we use a hardcoded URL to connect to the local DemoServer
-    std::fstream infile("server.conf");
     std::string url;
-    infile >> url;
+    if (server_opt != "")
+        url = server_opt;
+    else{
+        // For now we use a hardcoded URL to connect to the local DemoServer
+        std::fstream infile("server.conf");
+        infile >> url;
+    }
+
     UaString sURL(url.c_str());
 
     // Provide information about the client
@@ -597,7 +601,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     if (db)
     {
         printf("\ncreating index\n");
-        db->exec("REINDEX");
+        db->reindex();
     }
 
     return status;
@@ -621,7 +625,7 @@ UaStatus SampleClient::unsubscribe()
     return m_pSampleSubscription->deleteSubscription();
 }
 
-UaStatus SampleClient::browseSimple(std::string kks, bool recursive)//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
+UaStatus SampleClient::browseSimple(std::string kks, std::string recursive)//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
 {
     UaStatus result;
     UaNodeId nodeToBrowse;
@@ -643,7 +647,7 @@ UaStatus SampleClient::browseSimple(std::string kks, bool recursive)//const UaNo
     return result;
 }
 
-UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn,bool recursive)
+UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn,std::string  recursive)
 {
 
     UaStatus result;
@@ -655,6 +659,7 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
     browseContext.browseDirection = OpcUa_BrowseDirection_Forward;
     browseContext.referenceTypeId = OpcUaId_HierarchicalReferences;
     browseContext.includeSubtype = OpcUa_True;
+    browseContext.nodeClassMask=2;
     browseContext.maxReferencesToReturn = maxReferencesToReturn;
 //    printf("\nBrowsing from Node %s...\n", nodeToBrowse.toXmlString().toUtf8());
     result = m_pSession->browse(
@@ -666,8 +671,8 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
     if (result.isGood())
     {
         // print results
-        printBrowseResults(referenceDescriptions);
-        if (recursive)
+        printBrowseResults(referenceDescriptions, recursive);
+        if (recursive != "false")
             for (OpcUa_UInt32 i=0; i<referenceDescriptions.length() && exit_flag != true; i++)
             {
                 browseInternal(referenceDescriptions[i].NodeId.NodeId,0,recursive);
@@ -685,8 +690,8 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
             if (result.isGood())
             {
                 // print results
-                printBrowseResults(referenceDescriptions);
-                if (recursive)
+                printBrowseResults(referenceDescriptions,recursive);
+                if (recursive != "false")
                     for (OpcUa_UInt32 i=0; i<referenceDescriptions.length() && exit_flag != true; i++)
                     {
                         browseInternal(referenceDescriptions[i].NodeId.NodeId,0,recursive);
@@ -709,7 +714,7 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
 
 }
 
-void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDescriptions)
+void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDescriptions, std::string type_match)
 {
 
     UaStatus result;
@@ -806,8 +811,8 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
             // Service call failed
             fprintf(stderr, "read data type for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
         }
-
-        kks_fstream<<nodeId.toString().toUtf8()<<";"<<type<<";\""<< description<<"\"\n";
+    if (type_match == "all" || type == type_match)
+            kks_fstream<<nodeId.toString().toUtf8()<<"\n"; //";"<<type<<";\""<< description<<"\"\n";
 
     }
 }
@@ -998,6 +1003,12 @@ int sqlite_database::exec(const char* sql)
 
 }
 
+void sqlite_database::reindex()
+{
+    exec("REINDEX");
+}
+
+
 clickhouse_database::clickhouse_database(bool r, const char* server)
 {
     printf("Initialize client connection\n");
@@ -1034,7 +1045,7 @@ void clickhouse_database::init_synchro(std::vector<std::string> kks_array)
         exec(sql.c_str());
         sql = std::string("CREATE TABLE synchro_data ( \"") + kks_string +
                                       std::string(", \"timestamp\" DateTime64(3,'Europe/Moscow') ) "
-                                                  " ENGINE = MergeTree() PARTITION BY toYYYYMM(timestamp)"
+                                                  " ENGINE = MergeTree() PARTITION BY toYYYYMMDD(timestamp)"
                                                   " ORDER BY (timestamp) PRIMARY KEY (timestamp)");
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
@@ -1047,14 +1058,14 @@ void clickhouse_database::init_db(std::vector<std::string> kks_array)
     printf("init clickhouse tables\n");
     if (rewrite)
     {
-        init_synchro(kks_array);
+        //init_synchro(kks_array);
 
         std::string  sql = std::string("DROP TABLE IF EXISTS static_data;");
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
         exec(sql.c_str());
         sql = std::string("CREATE TABLE static_data ( id UInt64, name text, description text ) "
-                                                  " ENGINE = MergeTree() PARTITION BY id"
+                                                  " ENGINE = MergeTree()"
                                                   " ORDER BY (id) PRIMARY KEY (id)");
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
@@ -1095,4 +1106,9 @@ int clickhouse_database::exec(const char* sql)
     ch_db->Execute(sql);
     return 0;
 }
+
+void clickhouse_database::reindex()
+{
+}
+
 

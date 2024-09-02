@@ -48,6 +48,7 @@ public:
     virtual int exec(const char*) = 0;
     virtual ~database(){};
     virtual void init_synchro(std::vector<std::string>) = 0;
+    virtual void reindex() = 0;
 };
 
 class sqlite_database : public database
@@ -58,6 +59,7 @@ public:
     int exec(const char*);
     ~sqlite_database();
     void init_synchro(std::vector<std::string>);
+    void reindex();
 private:
     sqlite3 *sq_db;
 };
@@ -70,6 +72,7 @@ public:
     int exec(const char*);
     ~clickhouse_database();
     void init_synchro(std::vector<std::string>);
+    void reindex();
 private:
     clickhouse::Client* ch_db;
 };
@@ -86,16 +89,16 @@ public:
     // UaSessionCallback implementation ------------------------------------------------------
 
     // OPC UA service calls
-    UaStatus connect();
+    UaStatus connect(std::string);
     UaStatus disconnect();
     UaStatus read();
     UaStatus readHistory(const char*,const char*,int,int,bool);
     UaStatus subscribe();
     UaStatus unsubscribe();
 //    UaStatus returnNames();
-    UaStatus browseSimple(std::string, bool);
-    UaStatus browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn, bool recursive);
-    void printBrowseResults(const UaReferenceDescriptions& referenceDescriptions);
+    UaStatus browseSimple(std::string, std::string);
+    UaStatus browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn, std::string  recursive);
+    void printBrowseResults(const UaReferenceDescriptions& referenceDescriptions, std::string type_match);
 
 
 private:

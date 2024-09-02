@@ -93,6 +93,7 @@ int main(int argc, char*argv[])
             {"read-bad", 0, NULL,'x'},
             {"kks", 0, NULL,'k'},
             {"recursive", 0, NULL,'c'},
+            {"opc-server",0,NULL,'a'},
             {0, 0, 0, 0}
 	};
 
@@ -108,12 +109,13 @@ int main(int argc, char*argv[])
     bool kks_mode = false;
     bool history_mode = true;
     std::string kks = "";
-    bool recursive = false;
+    std::string recursive = "false";
     std::string clickhouse = "";
     std::string csv_file = "";
+    std::string opc_server = "";
 	// loop over all of the options
 	int ch;
-    while ((ch = getopt_long(argc, argv, "hou:f:d:m:s:b:e:p:t:rnwxk:ic", long_options, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "hou:f:d:m:s:b:e:p:t:rnwxk:ic:a:", long_options, NULL)) != -1)
 	{
 	    // check to see if a single character or long option came through
 	    switch (ch)
@@ -121,6 +123,7 @@ int main(int argc, char*argv[])
 	    	 case 'h':
 	    		 printf("read data from OPC UA\noptions:\n\
 --help(-h) this info\n\
+--opc-server (-a) opc server address \n\
 --clickhouse-server (-u) clickhouse server ip (table dynamic_data and static_data would be used)\n\
 --csv-file (-f) store result in local csv file\n\
 --ns(-s) number of space (1 by default)\n\
@@ -128,7 +131,7 @@ int main(int argc, char*argv[])
                  list subobjects from <id> object, strings, values, variables etc. \n\
                  all - from root folder, \n\
                  begin - from begin of object folder\n\
---recursive (-c) read tags recursively from all objects subobjects\n\
+--recursive (-c) <type> read tags recursively from all objects subobjects, filtered by type \n\
 --online(-o) online mode \n\
 --history(-i) history mode (default)\n\
 ONLINE:\n\
@@ -209,14 +212,19 @@ HISTORY MODE:\n\
                 kks = optarg;
                 break;
             case 'c':
-                recursive = true;
-                printf("recursive, ");
+                recursive = optarg;
+                printf("recursive, type= %s, ", recursive.c_str());
                 break;
             case 'i':
                history_mode = true;
                online = false;
                printf("read history, ");
                break;
+            case 'a':
+                opc_server = optarg;
+                printf("opc_server %s, ", recursive.c_str());
+                break;
+
 
 	    }
 	}
@@ -230,8 +238,8 @@ HISTORY MODE:\n\
     else if (kks_mode)
     {
         printf("KKS\n\n ns = %d, ", ns);
-        if (recursive)
-            printf("list of kks recursively from id= %s, ", kks.c_str());
+        if (recursive != "false")
+            printf("list of kks recursively from id= %s, type = %s", kks.c_str(), recursive.c_str());
         else
             printf("list of subobjects from id= %s, ", kks.c_str());
 
@@ -266,7 +274,7 @@ HISTORY MODE:\n\
     pMyClient = new SampleClient(delta,mean,ns,rewrite,read_bad,clickhouse,csv_file);
 
     // Connect to OPC UA Server
-    status_run = pMyClient->connect();
+    status_run = pMyClient->connect(opc_server);
 
     // Connect succeeded
     if (status_run.isGood())
