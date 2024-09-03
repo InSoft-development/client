@@ -944,7 +944,7 @@ void sqlite_database::init_synchro(std::vector<std::string> kks_array)
             kks_string.erase(kks_string.size()-3);
 
         std::string sql = std::string("DROP TABLE IF EXISTS synchro_data; CREATE TABLE synchro_data ( \"") + kks_string +
-                                      std::string(", \"timestamp\" timestamp with time zone NOT NULL );");
+                                      std::string(", \"timestamp\" timestamp );");
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
         exec(sql.c_str());
@@ -967,7 +967,7 @@ void sqlite_database::init_db(std::vector<std::string> kks_array)
 //            kks_string.erase(kks_string.size()-3);
 
 //        std::string sql = std::string("DROP TABLE IF EXISTS synchro_data; CREATE TABLE synchro_data ( \"") + kks_string +
-//                                      std::string(", \"timestamp\" timestamp with time zone NOT NULL );");
+//                                      std::string(", \"timestamp\" timestamp );");
 //        printf("%s\n",sql.c_str());
 //        /* Execute SQL statement */
 //        exec(sql.c_str());
@@ -996,7 +996,7 @@ void sqlite_database::init_db(std::vector<std::string> kks_array)
 
         /* Create SQL statement */
         sql = std::string("DROP TABLE IF EXISTS dynamic_data; "
-                          "CREATE TABLE dynamic_data ( id int, t timestamp without time zone NOT NULL,"
+                          "CREATE TABLE dynamic_data ( id int, t timestamp,"
                           " val real, status text, FOREIGN KEY(id) REFERENCES static_data(id) )");
 
         printf("%s\n",sql.c_str());
