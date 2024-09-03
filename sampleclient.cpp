@@ -471,8 +471,8 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                             if (value == "true") value = "1";
                             if (value == "false") value = "0";
 
-                            sql += std::string(" (\'") +
-                                kks + " \', \'" + sourceTS + "\', " +
+                            sql += std::string(" (") +
+                                std::to_string(id) + " , \'" + sourceTS + "\', " +
                                 value + ", \'" +
                                 statusOPLevel.toString().toUtf8() + "\' ),\n";
                         }
@@ -576,8 +576,8 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                                     if (value == "true") value = "1";
                                     if (value == "false") value = "0";
 
-                                    sql += std::string(" (\'") +
-                                        kks + " \', \'" + sourceTS + "\', " +
+                                    sql += std::string(" (") +
+                                        std::to_string(id) + " , \'" + sourceTS + "\', " +
                                         value + ", \'" +
                                         statusOPLevel.toString().toUtf8() + "\' ),\n";
                                 }
@@ -944,7 +944,7 @@ void sqlite_database::init_synchro(std::vector<std::string> kks_array)
             kks_string.erase(kks_string.size()-3);
 
         std::string sql = std::string("DROP TABLE IF EXISTS synchro_data; CREATE TABLE synchro_data ( \"") + kks_string +
-                                      std::string(", \"timestamp\" timestamp );");
+                                      std::string(", \"timestamp\" timestamp with time zone NOT NULL );");
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
         exec(sql.c_str());
@@ -967,36 +967,36 @@ void sqlite_database::init_db(std::vector<std::string> kks_array)
 //            kks_string.erase(kks_string.size()-3);
 
 //        std::string sql = std::string("DROP TABLE IF EXISTS synchro_data; CREATE TABLE synchro_data ( \"") + kks_string +
-//                                      std::string(", \"timestamp\" timestamp );");
+//                                      std::string(", \"timestamp\" timestamp with time zone NOT NULL );");
 //        printf("%s\n",sql.c_str());
 //        /* Execute SQL statement */
 //        exec(sql.c_str());
 
-//        std::string  sql = std::string("DROP TABLE IF EXISTS static_data;");
-//        printf("%s\n",sql.c_str());
-//        /* Execute SQL statement */
-//        exec(sql.c_str());
-//        sql = std::string("CREATE TABLE static_data ( id int, name text, description text, PRIMARY KEY(\"id\"));");
-//        printf("%s\n",sql.c_str());
-//        /* Execute SQL statement */
-//        exec(sql.c_str());
+        std::string  sql = std::string("DROP TABLE IF EXISTS static_data;");
+        printf("%s\n",sql.c_str());
+        /* Execute SQL statement */
+        exec(sql.c_str());
+        sql = std::string("CREATE TABLE static_data ( id int, name text, description text, PRIMARY KEY(\"id\"));");
+        printf("%s\n",sql.c_str());
+        /* Execute SQL statement */
+        exec(sql.c_str());
 
-//        sql = std::string("INSERT INTO static_data (id,name) VALUES ");
-//        int i = 0;
-//        for (auto k : kks_array)
-//        {
-//            sql += "(" + std::to_string(i) + ", \'" + k + "\'),\n";
-//            i++;
-//        }
-//        sql.pop_back();
-//        sql.pop_back();
-//        sql += ";";
-//        printf("%s\n",sql.c_str());
-//        exec( sql.c_str());
+        sql = std::string("INSERT INTO static_data (id,name) VALUES ");
+        int i = 0;
+        for (auto k : kks_array)
+        {
+            sql += "(" + std::to_string(i) + ", \'" + k + "\'),\n";
+            i++;
+        }
+        sql.pop_back();
+        sql.pop_back();
+        sql += ";";
+        printf("%s\n",sql.c_str());
+        exec( sql.c_str());
 
         /* Create SQL statement */
-        std::string sql = std::string("DROP TABLE IF EXISTS dynamic_data; "
-                          "CREATE TABLE dynamic_data ( id text, t timestamp,"
+        sql = std::string("DROP TABLE IF EXISTS dynamic_data; "
+                          "CREATE TABLE dynamic_data ( id int, t timestamp without time zone NOT NULL,"
                           " val real, status text, FOREIGN KEY(id) REFERENCES static_data(id) )");
 
         printf("%s\n",sql.c_str());
