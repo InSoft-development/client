@@ -77,7 +77,7 @@ int main(int argc, char*argv[])
 	{
             {"online",0,NULL,'o'},
             {"clickhouse-server",0, NULL,'u'},
-            {"csv-file",0, NULL,'f'},
+            {"file",0, NULL,'f'},
             {"history",0,NULL,'i'},
             {"delta", 0, NULL,'d'},
             {"mean", 0, NULL,'m'},
@@ -125,7 +125,7 @@ int main(int argc, char*argv[])
 --help(-h) this info\n\
 --opc-server (-a) opc server address \n\
 --clickhouse-server (-u) clickhouse server ip (table dynamic_data and static_data would be used)\n\
---csv-file (-f) store result in local csv file\n\
+--file (-f) store result in local csv file\n\
 --ns(-s) number of space (1 by default)\n\
 --kks(-k) <id> kks browse mode \n\
                  list subobjects from <id> object, strings, values, variables etc. \n\
@@ -158,7 +158,7 @@ HISTORY MODE:\n\
                 break;
             case 'f':
                 csv_file = optarg;
-                printf("csv_file %s, ", clickhouse.c_str());
+                printf("data output %s, ", csv_file.c_str());
                 break;
             case 'd':
                 delta = atoi(optarg);

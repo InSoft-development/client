@@ -54,7 +54,7 @@ public:
 class sqlite_database : public database
 {
 public:
-    sqlite_database(bool);
+    sqlite_database(bool, const char*);
     void init_db(std::vector<std::string>);
     int exec(const char*);
     ~sqlite_database();

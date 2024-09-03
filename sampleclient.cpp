@@ -68,21 +68,31 @@ SampleClient::SampleClient(int d, int m, int n = 1, bool r=false, bool b=false, 
     }
     if (c == "" && f == "")
     {
-        //printf("using local data.sqlite\n");
-        db = new sqlite_database(r);
+        printf("using local data.sqlite\n");
+        db = new sqlite_database(r,"data.sqlite");
 
     }
     else if (c != "")
     {
-        //printf("using clickhouse database\n");
+        printf("using clickhouse database\n");
         db = new clickhouse_database(r, c.c_str());
 
     }
     else if (f != "")
     {
-        //printf("using local %s csv file\n", f.c_str());
-        csv_fstream.open(f);
-        csv_fstream<<"id, timestamp, value, code\n";
+        //
+        if (f.substr(f.size() - 6) == "sqlite")
+        {
+            printf("using local %s database\n",f.c_str());
+            db = new sqlite_database(r,f.c_str());
+        }
+        else
+        {
+            printf("using local %s csv file\n", f.c_str());
+            csv_fstream.open(f);
+            csv_fstream<<"id, timestamp, value, code\n";
+        }
+
     }
     m_pSampleSubscription = new SampleSubscription(delta);
 }
@@ -412,6 +422,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
         if ( status.isNotGood() )
     	{
             fprintf(stderr, "** Error: %s UaSession::historyReadRawModified failed [ret=%s]\n", kks.c_str(), status.toString().toUtf8());
+            printf("** id %d Node=%s status=%s \n",id, nodeToRead.toXmlString().toUtf8(), status.toString().toUtf8());
             failed_kks << kks << " " << status.toString().toUtf8() << "\n";
     		continue;//return status;
     	}
@@ -421,13 +432,18 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     		for ( i=0; i<results.length(); i++ )
     		{
                 if (results[i].m_dataValues.length() ==0)
+                {
+                    printf("** id %d Node=%s status=empty_data_error \n",id, nodeToRead.toXmlString().toUtf8());
                     continue;
+                }
                 std::string first_value = (UaVariant(results[i].m_dataValues[0].Value).toString().toUtf8());
                 if (first_value.find_first_not_of("0123456789.,-") != std::string::npos &&
                         first_value != "true" && first_value != "false")
                 {
                     failed_kks << kks << " text field \n";
+                    printf("** id %d Node=%s status=text_field_error \n",id, nodeToRead.toXmlString().toUtf8());
                     continue;
+
                 }
     			UaStatus nodeResult(results[i].m_status);
                 printf("** id %d Results %d Node=%s status=%s  length=%d\n",id, i, nodeToRead.toXmlString().toUtf8(), nodeResult.toString().toUtf8(), results[i].m_dataValues.length());
@@ -529,6 +545,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     			{
                     fprintf(stderr, "** Error: %s UaSession::historyReadRawModified with CP failed [ret=%s]\n", kks.c_str(), status.toString().toUtf8());
                     failed_kks << kks << " " << status.toString().toUtf8() << "\n";
+                    printf("** id %d Node=%s status=%s \n",id, nodeToRead.toXmlString().toUtf8(), status.toString().toUtf8());
     				break;//return status;
     			}
     			else
@@ -537,7 +554,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     				for ( i=0; i<results.length(); i++ )
     				{
     					UaStatus nodeResult(results[i].m_status);
-                        printf("** ContinuationPoint id %d Results %d Node=%s status=%s length=%d\n", id, i, nodeToRead.toXmlString().toUtf8(), nodeResult.toString().toUtf8(),results[i].m_dataValues.length());
+                        //printf("** ContinuationPoint id %d Results %d Node=%s status=%s length=%d\n", id, i, nodeToRead.toXmlString().toUtf8(), nodeResult.toString().toUtf8(),results[i].m_dataValues.length());
                         sql = std::string("INSERT INTO dynamic_data (id,t,val,status) VALUES ");
 
                         for ( j=0; j<results[i].m_dataValues.length(); j++ )
@@ -895,10 +912,10 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
 //    return result;
 //}
 
-sqlite_database::sqlite_database(bool r)
+sqlite_database::sqlite_database(bool r,const char* f)
 {
     /* Open database */
-    int rc = sqlite3_open("data.sqlite", &sq_db);
+    int rc = sqlite3_open(f, &sq_db);
     if( rc ) {
        fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(sq_db));
     }
