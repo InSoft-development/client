@@ -160,19 +160,18 @@ void SampleClient::connectionStatusChanged(
     case UaClient::Disconnected:
         fprintf(stderr,"Connection status changed to Disconnected\n");
         break;
-        //exit(1);
     case UaClient::Connected:
         printf("Connection status changed to Connected\n");
         break;
     case UaClient::ConnectionWarningWatchdogTimeout:
         fprintf(stderr,"Connection status changed to ConnectionWarningWatchdogTimeout\n");
-        exit(1);
+        break;
     case UaClient::ConnectionErrorApiReconnect:
         fprintf(stderr,"Connection status changed to ConnectionErrorApiReconnect\n");
         break;
     case UaClient::ServerShutdown:
         fprintf(stderr,"Connection status changed to ServerShutdown\n");
-        exit(1);
+        break;
     case UaClient::NewSessionCreated:
         printf("Connection status changed to NewSessionCreated\n");
         break;
@@ -398,6 +397,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     int id = 0;
     while (infile >> kks)
     {
+        id++;
     	UaHistoryReadValueIds         nodesToRead;
     	nodesToRead.create(1);
     	HistoryReadDataResults        results;
@@ -473,8 +473,9 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
 
                             sql += std::string(" (") +
                                 std::to_string(id) + " , \'" + sourceTS + "\', " +
-                                value + ", \'" +
-                                statusOPLevel.toString().toUtf8() + "\' ),\n";
+                                value + ", " + std::to_string(results[i].m_dataValues[j].StatusCode) + "),\n";
+                                //value + ", \'" +
+                                //statusOPLevel.toString().toUtf8() + "\' ),\n";
                         }
 
 
@@ -578,8 +579,10 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
 
                                     sql += std::string(" (") +
                                         std::to_string(id) + " , \'" + sourceTS + "\', " +
-                                        value + ", \'" +
-                                        statusOPLevel.toString().toUtf8() + "\' ),\n";
+                                        value + ", " + std::to_string(results[i].m_dataValues[j].StatusCode) + "),\n";
+
+//                                        value + ", \'" +
+//                                        statusOPLevel.toString().toUtf8() + "\' ),\n";
                                 }
 
 
@@ -613,7 +616,6 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     			}
     		}
     	}
-        id++;
     }
     if (db)
     {
@@ -752,6 +754,8 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
 
         nodeToRead[0].AttributeId = OpcUa_Attributes_Description;
         UaNodeId test(UaString(nodeId.toString().toUtf8()),ns);
+
+        /*
         test.copyTo(&nodeToRead[0].NodeId);
         nodeId.copyTo(&nodeToRead[0].NodeId);
         result = m_pSession->read(serviceSettings,
@@ -777,7 +781,7 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
         {
             // Service call failed
             fprintf(stderr, "read description for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
-        }
+        }*/
 
         nodeToRead[0].AttributeId = OpcUa_Attributes_DataType;
         UaNodeId test_type(UaString(nodeId.toString().toUtf8()),ns);
@@ -997,12 +1001,12 @@ void sqlite_database::init_db(std::vector<std::string> kks_array)
         /* Create SQL statement */
         sql = std::string("DROP TABLE IF EXISTS dynamic_data; "
                           "CREATE TABLE dynamic_data ( id int, t timestamp,"
-                          " val real, status text, FOREIGN KEY(id) REFERENCES static_data(id) )");
+                          " val real, status int )");
 
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
         exec(sql.c_str());
-        exec("CREATE INDEX IF NOT EXISTS \"idd\" ON \"dynamic_data\"(\"id\"  ASC)");
+        //exec("CREATE INDEX IF NOT EXISTS \"idd\" ON \"dynamic_data\"(\"id\"  ASC)");
     }
 
 }
@@ -1022,7 +1026,7 @@ int sqlite_database::exec(const char* sql)
 
 void sqlite_database::reindex()
 {
-    exec("REINDEX");
+    //exec("REINDEX");
 }
 
 
@@ -1098,7 +1102,8 @@ void clickhouse_database::init_db(std::vector<std::string> kks_array)
         sql.pop_back();
         sql.pop_back();
         sql += ";";
-        printf("%s\n",sql.c_str());
+        std::cout<<kks_array.size()<<" elements inserted to static_data\n";
+        //printf("%s\n",sql.c_str());
         exec( sql.c_str());
 
 
@@ -1109,7 +1114,7 @@ void clickhouse_database::init_db(std::vector<std::string> kks_array)
         exec(sql.c_str());
         /* Create SQL statement */
         sql = std::string("CREATE TABLE dynamic_data ( id UInt64, t DateTime64(3,'Europe/Moscow'), "
-                          "val Float64, status text ) ENGINE = MergeTree()"
+                          "val Float64, status UInt64 ) ENGINE = MergeTree()"
                           " PARTITION BY toYYYYMM(t) ORDER BY (t) PRIMARY KEY (t)");
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
