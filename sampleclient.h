@@ -91,6 +91,7 @@ public:
     // OPC UA service calls
     UaStatus connect(std::string);
     UaStatus disconnect();
+    UaStatus reconnect();
     UaStatus read();
     UaStatus readHistory(const char*,const char*,int,int,bool);
     UaStatus subscribe();

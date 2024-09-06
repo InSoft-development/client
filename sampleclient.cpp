@@ -226,6 +226,12 @@ UaStatus SampleClient::connect(std::string server_opt)
         fprintf(stderr, "Connect failed with status %s\n", result.toString().toUtf8());
     }
 
+    std::cout<<"m_pSession->getEndpointUrl().toUtf8() "<<m_pSession->getEndpointUrl().toUtf8();
+    std::cout<<"m_pSession->getServerProductUri().toUtf8() "<<m_pSession->getServerProductUri().toUtf8();
+    std::cout<<"m_pSession->getServerApplicationUri().toUtf8() "<<m_pSession->getServerApplicationUri().toUtf8();
+    std::cout<<"m_pSession->currentlyUsedEndpointUrl().toUtf8() "<<m_pSession->currentlyUsedEndpointUrl().toUtf8();
+
+
     return result;
 }
 
@@ -252,6 +258,20 @@ UaStatus SampleClient::disconnect()
             fprintf(stderr, "Disconnect failed with status %s\n", result.toString().toUtf8());
         }
 
+        return result;
+    }
+}
+
+UaStatus SampleClient::reconnect()
+{
+
+    if (m_pSession->isConnected() == OpcUa_False)
+        return UaStatus(OpcUa_BadDisconnect);
+    else {
+        UaString sURL = m_pSession->getEndpointUrl().toUtf8();
+        UaStatus result = disconnect();
+        if(result.isGood())
+            result = connect(sURL.toUtf8());
         return result;
     }
 }
@@ -395,8 +415,10 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
 
     std::string sql;
     int id = 0;
+    int N_rows = 0;
     while (infile >> kks)
     {
+
         id++;
     	UaHistoryReadValueIds         nodesToRead;
     	nodesToRead.create(1);
@@ -434,7 +456,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                 if (results[i].m_dataValues.length() ==0)
                 {
                     printf("** id %d Node=%s status=empty_data_error \n",id, nodeToRead.toXmlString().toUtf8());
-                    continue;
+                    break;
                 }
                 std::string first_value = (UaVariant(results[i].m_dataValues[0].Value).toString().toUtf8());
                 if (first_value.find_first_not_of("0123456789.,-") != std::string::npos &&
@@ -442,11 +464,12 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                 {
                     failed_kks << kks << " text field \n";
                     printf("** id %d Node=%s status=text_field_error \n",id, nodeToRead.toXmlString().toUtf8());
-                    continue;
+                    break;
 
                 }
     			UaStatus nodeResult(results[i].m_status);
                 printf("** id %d Results %d Node=%s status=%s  length=%d\n",id, i, nodeToRead.toXmlString().toUtf8(), nodeResult.toString().toUtf8(), results[i].m_dataValues.length());
+                N_rows += results[i].m_dataValues.length();
                 if ( nodeResult.isNotGood() )
                 {
                     failed_kks << kks << " " << status.toString().toUtf8() << "\n";
@@ -555,7 +578,8 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     				for ( i=0; i<results.length(); i++ )
     				{
     					UaStatus nodeResult(results[i].m_status);
-                        //printf("** ContinuationPoint id %d Results %d Node=%s status=%s length=%d\n", id, i, nodeToRead.toXmlString().toUtf8(), nodeResult.toString().toUtf8(),results[i].m_dataValues.length());
+                        printf("** ContinuationPoint id %d Results %d Node=%s status=%s length=%d\n", id, i, nodeToRead.toXmlString().toUtf8(), nodeResult.toString().toUtf8(),results[i].m_dataValues.length());
+                        N_rows += results[i].m_dataValues.length();
                         sql = std::string("INSERT INTO dynamic_data (id,t,val,status) VALUES ");
 
                         for ( j=0; j<results[i].m_dataValues.length(); j++ )
@@ -616,6 +640,13 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     			}
     		}
     	}
+        std::cout<<"\nN_rows="<<N_rows<<"\n";
+        if (N_rows > 5000000)
+        {
+            N_rows = 0;
+            reconnect();
+        }
+
     }
     if (db)
     {
