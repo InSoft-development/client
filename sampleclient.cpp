@@ -158,22 +158,22 @@ void SampleClient::connectionStatusChanged(
     switch (serverStatus)
     {
     case UaClient::Disconnected:
-        fprintf(stderr,"Connection status changed to Disconnected\n");
+        printf("\nConnection status changed to Disconnected\n");
         break;
     case UaClient::Connected:
-        printf("Connection status changed to Connected\n");
+        printf("\nConnection status changed to Connected\n");
         break;
     case UaClient::ConnectionWarningWatchdogTimeout:
-        fprintf(stderr,"Connection status changed to ConnectionWarningWatchdogTimeout\n");
+        fprintf(stderr,"Error: Connection status changed to ConnectionWarningWatchdogTimeout\n");
         break;
     case UaClient::ConnectionErrorApiReconnect:
-        fprintf(stderr,"Connection status changed to ConnectionErrorApiReconnect\n");
+        fprintf(stderr,"Error: Connection status changed to ConnectionErrorApiReconnect\n");
         break;
     case UaClient::ServerShutdown:
-        fprintf(stderr,"Connection status changed to ServerShutdown\n");
+        fprintf(stderr,"Error: Connection status changed to ServerShutdown\n");
         break;
     case UaClient::NewSessionCreated:
-        printf("Connection status changed to NewSessionCreated\n");
+        fprintf(stderr, "Error: Connection status changed to NewSessionCreated\n");
         break;
     }
     printf("-------------------------------------------------------------\n");
@@ -182,7 +182,6 @@ void SampleClient::connectionStatusChanged(
 UaStatus SampleClient::connect(std::string server_opt)
 {
     UaStatus result;
-    std::string url;
     if (server_opt != "")
         url = server_opt;
     else{
@@ -223,13 +222,13 @@ UaStatus SampleClient::connect(std::string server_opt)
     }
     else
     {
-        fprintf(stderr, "Connect failed with status %s\n", result.toString().toUtf8());
+        fprintf(stderr, "Error: Connect failed with status %s\n", result.toString().toUtf8());
     }
 
-    std::cout<<"m_pSession->getEndpointUrl().toUtf8() "<<m_pSession->getEndpointUrl().toUtf8();
-    std::cout<<"m_pSession->getServerProductUri().toUtf8() "<<m_pSession->getServerProductUri().toUtf8();
-    std::cout<<"m_pSession->getServerApplicationUri().toUtf8() "<<m_pSession->getServerApplicationUri().toUtf8();
-    std::cout<<"m_pSession->currentlyUsedEndpointUrl().toUtf8() "<<m_pSession->currentlyUsedEndpointUrl().toUtf8();
+//    std::cout<<"m_pSession->getEndpointUrl().toUtf8() "<<m_pSession->getEndpointUrl().toUtf8();
+//    std::cout<<"m_pSession->getServerProductUri().toUtf8() "<<m_pSession->getServerProductUri().toUtf8();
+//    std::cout<<"m_pSession->getServerApplicationUri().toUtf8() "<<m_pSession->getServerApplicationUri().toUtf8();
+//    std::cout<<"m_pSession->currentlyUsedEndpointUrl().toUtf8() "<<m_pSession->currentlyUsedEndpointUrl().toUtf8();
 
 
     return result;
@@ -255,25 +254,24 @@ UaStatus SampleClient::disconnect()
         }
         else
         {
-            fprintf(stderr, "Disconnect failed with status %s\n", result.toString().toUtf8());
+            fprintf(stderr, "Error: Disconnect failed with status %s\n", result.toString().toUtf8());
         }
 
         return result;
     }
 }
 
-UaStatus SampleClient::reconnect()
+UaStatus SampleClient::reconnect(int p)
 {
 
-    if (m_pSession->isConnected() == OpcUa_False)
-        return UaStatus(OpcUa_BadDisconnect);
-    else {
-        UaString sURL = m_pSession->getEndpointUrl().toUtf8();
-        UaStatus result = disconnect();
-        if(result.isGood())
-            result = connect(sURL.toUtf8());
-        return result;
-    }
+    if (!m_pSession) //->isConnected() == OpcUa_False)
+        fprintf(stderr, "Error: Session null in reconnect\n");
+    else
+         disconnect();
+    UaThread::msleep(p);
+    UaStatus result = connect(url);
+    return result;
+
 }
 
 UaStatus SampleClient::read()
@@ -337,13 +335,13 @@ UaStatus SampleClient::read()
         	}	
         	else
         	{
-                    fprintf(stderr, "Read failed for %s with status %s\n", UaNodeId(nodeToRead[item_index].NodeId).toXmlString().toUtf8(),UaStatus(values[0].StatusCode).toString().toUtf8());
+                    fprintf(stderr, "Error: Read failed for %s with status %s\n", UaNodeId(nodeToRead[item_index].NodeId).toXmlString().toUtf8(),UaStatus(values[0].StatusCode).toString().toUtf8());
         	}
     	}
    	else
     	{
         	// Service call failed
-            fprintf(stderr, "Read failed with status %s\n", result.toString().toUtf8());
+            fprintf(stderr, "Error: Read failed with status %s\n", result.toString().toUtf8());
 		break;
     	}
     }
@@ -455,15 +453,15 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     		{
                 if (results[i].m_dataValues.length() ==0)
                 {
-                    printf("** id %d Node=%s status=empty_data_error \n",id, nodeToRead.toXmlString().toUtf8());
+                    printf("** id %d Node=%s status=empty_data_warning\n",id, nodeToRead.toXmlString().toUtf8());
                     break;
                 }
                 std::string first_value = (UaVariant(results[i].m_dataValues[0].Value).toString().toUtf8());
-                if (first_value.find_first_not_of("0123456789.,-") != std::string::npos &&
+                if (first_value.find_first_not_of("0123456789.,-Ee") != std::string::npos &&
                         first_value != "true" && first_value != "false")
                 {
                     failed_kks << kks << " text field \n";
-                    printf("** id %d Node=%s status=text_field_error \n",id, nodeToRead.toXmlString().toUtf8());
+                    printf("** id %d Node=%s status=text_field_warning \n",id, nodeToRead.toXmlString().toUtf8());
                     break;
 
                 }
@@ -641,16 +639,18 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     		}
     	}
         std::cout<<"\nN_rows="<<N_rows<<"\n";
-        if (N_rows > 5000000)
+        if (N_rows > 0)
         {
             N_rows = 0;
-            reconnect();
+            std::cout<<"\nKKS WITH HISTORY: "<<kks<<"\n";
+
+            reconnect(pause*3);
         }
 
     }
     if (db)
     {
-        printf("\ncreating index\n");
+        //printf("\ncreating index\n");
         db->reindex();
     }
 
@@ -675,7 +675,7 @@ UaStatus SampleClient::unsubscribe()
     return m_pSampleSubscription->deleteSubscription();
 }
 
-UaStatus SampleClient::browseSimple(std::string kks, std::string recursive)//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
+UaStatus SampleClient::browseSimple(std::string kks, std::string recursive, std::string csv_file)//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
 {
     UaStatus result;
     UaNodeId nodeToBrowse;
@@ -687,13 +687,16 @@ UaStatus SampleClient::browseSimple(std::string kks, std::string recursive)//con
         nodeToBrowse = UaNodeId(OpcUaId_ObjectsFolder);
     else
         nodeToBrowse = UaNodeId(UaString(kks.c_str()),ns);
-    kks_fstream.open("kks.csv");
+    if (csv_file != "")
+        kks_fstream = std::fopen(csv_file.c_str(), "w");
+    else
+        kks_fstream = stdout;
     browse_internal = true;
     signal(SIGINT, signalHandler_for_browse);
     signal(SIGTERM, signalHandler_for_browse);
 
     result = browseInternal(nodeToBrowse, 0, recursive);
-    kks_fstream.close();
+    if (csv_file != "") std::fclose(kks_fstream);
     return result;
 }
 
@@ -750,14 +753,14 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
             else
             {
                 // Service call failed
-                fprintf(stderr, "BrowseNext failed with status %s\n", result.toString().toUtf8());
+                fprintf(stderr, "Error: BrowseNext failed with status %s\n", result.toString().toUtf8());
             }
         }
     }
     else
     {
         // Service call failed
-        fprintf(stderr, "Browse failed with status %s\n", result.toString().toUtf8());
+        fprintf(stderr, "Error: Browse failed with status %s\n", result.toString().toUtf8());
     }
 
     return result;
@@ -853,7 +856,7 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
                 else
                 {
                     // Service call failed
-                    fprintf(stderr, "read data type disaplay name for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
+                    fprintf(stderr, "Error: read data type disaplay name for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
                 }
 
             }
@@ -861,10 +864,10 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
         else
         {
             // Service call failed
-            fprintf(stderr, "read data type for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
+            fprintf(stderr, "Error: read data type for %s failed with status %s\n", nodeId.toString().toUtf8(), result.toString().toUtf8());
         }
-    if (type_match == "all" || type == type_match)
-            kks_fstream<<nodeId.toString().toUtf8()<<"\n"; //";"<<type<<";\""<< description<<"\"\n";
+    if (type_match == "all" ||type_match == "false" || type == type_match)
+            fprintf(kks_fstream, "\n%s\n", nodeId.toString().toUtf8());//<<"\n"; //";"<<type<<";\""<< description<<"\"\n";
 
     }
 }
@@ -952,7 +955,7 @@ sqlite_database::sqlite_database(bool r,const char* f)
     /* Open database */
     int rc = sqlite3_open(f, &sq_db);
     if( rc ) {
-       fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(sq_db));
+       fprintf(stderr, "Error: Can't open database: %s\n", sqlite3_errmsg(sq_db));
     }
     rewrite = r;
 }

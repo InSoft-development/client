@@ -91,19 +91,20 @@ public:
     // OPC UA service calls
     UaStatus connect(std::string);
     UaStatus disconnect();
-    UaStatus reconnect();
+    UaStatus reconnect(int);
     UaStatus read();
     UaStatus readHistory(const char*,const char*,int,int,bool);
     UaStatus subscribe();
     UaStatus unsubscribe();
 //    UaStatus returnNames();
-    UaStatus browseSimple(std::string, std::string);
+    UaStatus browseSimple(std::string, std::string, std::string);
     UaStatus browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn, std::string  recursive);
     void printBrowseResults(const UaReferenceDescriptions& referenceDescriptions, std::string type_match);
 
 
 private:
     UaSession*          m_pSession;
+    std::string url;
     SampleSubscription* m_pSampleSubscription;
     bool read_bad;
     int delta;
@@ -111,7 +112,7 @@ private:
     unsigned short ns;
     std::map<std::string,std::vector<double>> slice_data;
     std::vector<std::string> kks_array;
-    std::ofstream kks_fstream;
+    FILE* kks_fstream;
     database* db;
     std::ofstream csv_fstream;
     void init_db();

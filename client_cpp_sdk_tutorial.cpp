@@ -290,7 +290,7 @@ HISTORY MODE:\n\
         }
         else if (kks_mode)
         {
-                status_run = pMyClient->browseSimple(kks.c_str(),recursive);
+                status_run = pMyClient->browseSimple(kks.c_str(),recursive,csv_file);
         }
         else if (history_mode)
         {
