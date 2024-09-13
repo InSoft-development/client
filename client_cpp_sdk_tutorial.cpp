@@ -127,20 +127,24 @@ int main(int argc, char*argv[])
 --clickhouse-server (-u) clickhouse server ip (table dynamic_data and static_data would be used)\n\
 --file (-f) store result in local csv file\n\
 --ns(-s) number of space (1 by default)\n\
---kks(-k) <id> kks browse mode \n\
-                 list subobjects from <id> object, strings, values, variables etc. \n\
-                 all - from root folder, \n\
-                 begin - from begin of object folder\n\
---recursive (-c) <type> read tags recursively from all objects subobjects, filtered by type \n\
---online(-o) online mode \n\
---history(-i) history mode (default)\n\
+KKS  MODE:\n\
+--kks(-k) <id> kks browse mode. List subobjects from <id> object. \"all\" - from root folder, \"begin\" - \
+from begin of object folder. Results would be printed to out - or file, if  (-f) used \n\
+--recursive (-c) <type> read tags recursively from all objects subobjects, filtered by type, type \"all\" or \"false\" \
+means no filtration. Storing to file, if (-f) \n\
 ONLINE:\n\
+--online(-o) online mode \n\
 --delta(-d) miliseconds between reading from OPC UA, default 1000\n\
---mean(-m) count of averaging: 1 means we don't calculate average and send each slice to DB, 5 - we calculate 5 slices to one mean and send it to DB. default 5\n\
+--mean(-m) count of averaging: 1 means we don't calculate average and send each slice to DB, \
+5 - we calculate 5 slices to one mean and send it to DB. default 5\n\
 HISTORY MODE:\n\
+--history(-i) history mode (default)\n\
 --begin(-b) <timestamp> in YYYY-MM-DDTHH:MM:SS.MMMZ format (e.g. 2021-06-01T00:00:00.000Z\n\
 --end(-e) <timestramp>\n\
---pause(-p) <miliseconds> pause between requests\n\
+--pause(-p) <miliseconds> pause between requests. default 5000. After successfull reading of each tag - \
+connection would be disconnected, wait 3*pause and reconnecetd. It's not recommended to set pause less, then 10. \
+It's not recommended to read more than 1 million records from one tag at one time - \
+use more short intervals (one month for example) foe big tags\n\
 --timeout(-t) <ms> maximum timeout, that we are waiting for response from server\n\
 --read-bounds(-r) if we need to read bounds\n\
 --no-bounds(-n) if we don\'t want read bounds (default)\n\
