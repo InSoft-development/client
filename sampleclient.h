@@ -48,7 +48,8 @@ public:
     virtual int exec(const char*) = 0;
     virtual ~database(){};
     virtual void init_synchro(std::vector<std::string>) = 0;
-    virtual void reindex() = 0;
+    virtual void finalize_db() = 0;
+    virtual int id(std::string) = 0;
 };
 
 class sqlite_database : public database
@@ -59,7 +60,8 @@ public:
     int exec(const char*);
     ~sqlite_database();
     void init_synchro(std::vector<std::string>);
-    void reindex();
+    void finalize_db();
+    int id(std::string);
 private:
     sqlite3 *sq_db;
 };
@@ -72,7 +74,8 @@ public:
     int exec(const char*);
     ~clickhouse_database();
     void init_synchro(std::vector<std::string>);
-    void reindex();
+    void finalize_db();
+    int id(std::string);
 private:
     clickhouse::Client* ch_db;
 };

@@ -380,8 +380,10 @@ UaStatus SampleClient::read()
 
 UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, int timeout, bool read_bounds)
 {
+
     if (db)
         init_db();
+//    return 0;
     //std::ofstream data ("data.csv");
     //data<<"kks;value;timestamp;status\n";
     UaStatus                      status;
@@ -416,8 +418,11 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     int N_rows = 0;
     while (infile >> kks)
     {
-
-        id++;
+        if (db)
+            id = db->id(kks);
+        else
+            ++id;
+        std::cout<<"\n\nID: "<<id<<"\n\n";
     	UaHistoryReadValueIds         nodesToRead;
     	nodesToRead.create(1);
     	HistoryReadDataResults        results;
@@ -442,7 +447,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
         if ( status.isNotGood() )
     	{
             fprintf(stderr, "** Error: %s UaSession::historyReadRawModified failed [ret=%s]\n", kks.c_str(), status.toString().toUtf8());
-            printf("** id %d Node=%s status=%s \n",id, nodeToRead.toXmlString().toUtf8(), status.toString().toUtf8());
+//            printf("** id %d Node=%s status=%s \n",id, nodeToRead.toXmlString().toUtf8(), status.toString().toUtf8());
             failed_kks << kks << " " << status.toString().toUtf8() << "\n";
     		continue;//return status;
     	}
@@ -567,7 +572,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     			{
                     fprintf(stderr, "** Error: %s UaSession::historyReadRawModified with CP failed [ret=%s]\n", kks.c_str(), status.toString().toUtf8());
                     failed_kks << kks << " " << status.toString().toUtf8() << "\n";
-                    printf("** id %d Node=%s status=%s \n",id, nodeToRead.toXmlString().toUtf8(), status.toString().toUtf8());
+//                    printf("** id %d Node=%s status=%s \n",id, nodeToRead.toXmlString().toUtf8(), status.toString().toUtf8());
     				break;//return status;
     			}
     			else
@@ -650,8 +655,8 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     }
     if (db)
     {
-        //printf("\ncreating index\n");
-        db->reindex();
+        printf("\noptimizing db\n");
+        db->finalize_db();
     }
 
     return status;
@@ -1010,38 +1015,73 @@ void sqlite_database::init_db(std::vector<std::string> kks_array)
 //        /* Execute SQL statement */
 //        exec(sql.c_str());
 
-        std::string  sql = std::string("DROP TABLE IF EXISTS static_data;");
+        std::string  sql = std::string("DROP TABLE IF EXISTS static_data; DROP TABLE IF EXISTS dynamic_data;");
         printf("%s\n",sql.c_str());
-        /* Execute SQL statement */
-        exec(sql.c_str());
-        sql = std::string("CREATE TABLE static_data ( id int, name text, description text, PRIMARY KEY(\"id\"));");
-        printf("%s\n",sql.c_str());
-        /* Execute SQL statement */
-        exec(sql.c_str());
 
-        sql = std::string("INSERT INTO static_data (id,name) VALUES ");
-        int i = 0;
-        for (auto k : kks_array)
-        {
-            sql += "(" + std::to_string(i) + ", \'" + k + "\'),\n";
-            i++;
+        /* Execute SQL statement */
+        exec(sql.c_str());
+    }
+    std::string sql = std::string("CREATE TABLE IF NOT EXISTS static_data ( id int, name text, description text, PRIMARY KEY(\"id\"));");
+    printf("%s\n",sql.c_str());
+    /* Execute SQL statement */
+    exec(sql.c_str());
+
+    /* Create SQL statement */
+    sql = std::string("CREATE TABLE IF NOT EXISTS dynamic_data ( id int, t timestamp,"
+                      " val real, status int )");
+
+    printf("%s\n",sql.c_str());
+    /* Execute SQL statement */
+    exec(sql.c_str());
+
+    int i = 0;
+    if (!rewrite)
+    {
+        sql = "SELECT MAX(id) from static_data";
+        char *zErrMsg = 0;
+        int rc;
+        static int id;
+        id = -1;
+        rc = sqlite3_exec(sq_db, sql.c_str(), [](void *, int argc, char **argv, char **) -> int {
+                              if (argc>0 && argv[0] && std::strlen(argv[0])>0) id = std::atoi(argv[0]);
+                              return 0;
+                           }, 0, &zErrMsg);
+        if( rc != SQLITE_OK ){
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+            sqlite3_free(zErrMsg);
         }
-        sql.pop_back();
-        sql.pop_back();
-        sql += ";";
+        else
+        {
+            if (id > 0)
+                i = id;
+        }
+
+    }
+    std::cout<<"max id = " << i <<"\n";
+    bool need_merge = false;
+    sql = std::string("INSERT INTO static_data (id,name) VALUES ");
+    for (auto k : kks_array)
+    {
+        if (id(k) < 1)
+        {
+            sql += "(" + std::to_string(++i) + ", \'" + k + "\'),\n";
+            need_merge = true;
+        }
+
+    }
+    sql.pop_back();
+    sql.pop_back();
+    sql += ";";
+
+    if (need_merge)
+    {
         printf("%s\n",sql.c_str());
         exec( sql.c_str());
-
-        /* Create SQL statement */
-        sql = std::string("DROP TABLE IF EXISTS dynamic_data; "
-                          "CREATE TABLE dynamic_data ( id int, t timestamp,"
-                          " val real, status int )");
-
-        printf("%s\n",sql.c_str());
-        /* Execute SQL statement */
-        exec(sql.c_str());
-        //exec("CREATE INDEX IF NOT EXISTS \"idd\" ON \"dynamic_data\"(\"id\"  ASC)");
     }
+
+
+    //exec("CREATE INDEX IF NOT EXISTS \"idd\" ON \"dynamic_data\"(\"id\"  ASC)");
+
 
 }
 
@@ -1058,9 +1098,37 @@ int sqlite_database::exec(const char* sql)
 
 }
 
-void sqlite_database::reindex()
+int sqlite_database::id(std::string kks)
 {
-    //exec("REINDEX");
+    //std::cout<<kks<<"\n";
+    std::string sql = "SELECT id from static_data where name = \"" + kks + "\"";
+    char *zErrMsg = 0;
+    int rc;
+    static int id;
+    id = -1;
+    rc = sqlite3_exec(sq_db, sql.c_str(), [](void *, int argc, char **argv, char **) -> int {
+                          //std::cout<<argv[0]<<"\n";
+                          if (argc>0 && argv[0] && std::strlen(argv[0])>0) id = std::atoi(argv[0]);
+                          return 0;
+                       }, 0, &zErrMsg);
+    if( rc != SQLITE_OK ){
+    fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        sqlite3_free(zErrMsg);
+        return -1;
+    }
+    else
+    {
+        //std::cout<<"\n" << kks<<" id = "<<id<<"\n";
+        return id;
+    }
+}
+
+
+void sqlite_database::finalize_db()
+{
+    exec("DELETE FROM dynamic_data WHERE rowid NOT IN (\
+         SELECT MIN(rowid) FROM dynamic_data GROUP BY id, t, val, status\
+       );VACUUM;");
 }
 
 
@@ -1117,42 +1185,66 @@ void clickhouse_database::init_db(std::vector<std::string> kks_array)
 
         std::string  sql = std::string("DROP TABLE IF EXISTS static_data;");
         printf("%s\n",sql.c_str());
-        /* Execute SQL statement */
-        exec(sql.c_str());
-        sql = std::string("CREATE TABLE static_data ( id UInt64, name text, description text ) "
-                                                  " ENGINE = MergeTree()"
-                                                  " ORDER BY (id) PRIMARY KEY (id)");
-        printf("%s\n",sql.c_str());
-        /* Execute SQL statement */
         exec(sql.c_str());
 
-        sql = std::string("INSERT INTO static_data (id,name) VALUES ");
-        int i = 0;
-        for (auto k : kks_array)
-        {
-            sql += "(" + std::to_string(i) + ", \'" + k + "\'),\n";
-            i++;
-        }
-        sql.pop_back();
-        sql.pop_back();
-        sql += ";";
-        std::cout<<kks_array.size()<<" elements inserted to static_data\n";
-        //printf("%s\n",sql.c_str());
-        exec( sql.c_str());
-
-
-        /* Create SQL statement */
         sql = std::string("DROP TABLE IF EXISTS dynamic_data;");
         printf("%s\n",sql.c_str());
         /* Execute SQL statement */
         exec(sql.c_str());
-        /* Create SQL statement */
-        sql = std::string("CREATE TABLE dynamic_data ( id UInt64, t DateTime64(3,'Europe/Moscow'), "
-                          "val Float64, status UInt64 ) ENGINE = MergeTree()"
-                          " PARTITION BY toYYYYMM(t) ORDER BY (t) PRIMARY KEY (t)");
+    }
+
+    std::string sql = std::string("CREATE TABLE IF NOT EXISTS static_data ( id UInt64, name text, description text ) "
+                                  " ENGINE = MergeTree()"
+                                  " ORDER BY (id) PRIMARY KEY (id)");
+    printf("%s\n",sql.c_str());
+    /* Execute SQL statement */
+    exec(sql.c_str());
+
+    /* Create SQL statement */
+
+    /* Create SQL statement */
+    sql = std::string("CREATE TABLE IF NOT EXISTS  dynamic_data ( id UInt64, t DateTime64(3,'Europe/Moscow'), "
+                      "val Float64, status UInt64 ) ENGINE = MergeTree()"
+                      " PARTITION BY id ORDER BY (t) PRIMARY KEY (t)");
+    printf("%s\n",sql.c_str());
+    /* Execute SQL statement */
+    exec(sql.c_str());
+
+
+
+    int i = 0;
+    if (!rewrite)
+    {
+        sql = "SELECT MAX(id) from static_data;";
+        static int id;
+        id = -1;
+        ch_db->Select(sql.c_str(), [](const clickhouse::Block& block)
+                {   if (block.GetRowCount() == 0) return;
+                    else id = block[0]->As<clickhouse::ColumnUInt64>()->At(0);
+                }
+            );
+        if (id > 0) i = id;
+    }
+    std::cout<<"max id = " << i <<"\n";
+    bool need_merge = false;
+    sql = std::string("INSERT INTO static_data (id,name) VALUES ");
+    for (auto k : kks_array)
+    {
+        std::cout<<k<<" " << id(k)<<"\n";
+        if (id(k) < 1)
+        {
+            sql += "(" + std::to_string(++i) + ", \'" + k + "\'),\n";
+            need_merge = true;
+        }
+    }
+    sql.pop_back();
+    sql.pop_back();
+    sql += ";";
+    //std::cout<<kks_array.size()<<" elements inserted to static_data\n";
+    if (need_merge)
+    {
         printf("%s\n",sql.c_str());
-        /* Execute SQL statement */
-        exec(sql.c_str());
+        exec( sql.c_str());
     }
 
 }
@@ -1163,7 +1255,22 @@ int clickhouse_database::exec(const char* sql)
     return 0;
 }
 
-void clickhouse_database::reindex()
+int clickhouse_database::id(std::string kks)
+{
+    std::string sql = std::string("SELECT id FROM static_data WHERE name = \'") + kks + "\'";
+    static int id;
+    id = -1;
+    ch_db->Select(sql.c_str(), [](const clickhouse::Block& block)
+            {
+                if (block.GetRowCount() == 0) return;
+                else id = block[0]->As<clickhouse::ColumnUInt64>()->At(0);
+            }
+        );
+
+    return id;
+}
+
+void clickhouse_database::finalize_db()
 {
 }
 
