@@ -1206,7 +1206,7 @@ void clickhouse_database::init_db(std::vector<std::string> kks_array)
     /* Create SQL statement */
     sql = std::string("CREATE TABLE IF NOT EXISTS  dynamic_data ( id UInt64, t DateTime64(3,'Europe/Moscow'), "
                       "val Float64, status UInt64 ) ENGINE = MergeTree()"
-                      " PARTITION BY id ORDER BY (t) PRIMARY KEY (t)");
+                      " PARTITION BY (id,toYYYYMM(t)) ORDER BY (t) PRIMARY KEY (id,t)");
     printf("%s\n",sql.c_str());
     /* Execute SQL statement */
     exec(sql.c_str());
@@ -1273,6 +1273,7 @@ int clickhouse_database::id(std::string kks)
 
 void clickhouse_database::finalize_db()
 {
+    exec("OPTIMIZE TABLE dynamic_data DEDUPLICATE");
 }
 
 
