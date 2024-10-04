@@ -478,7 +478,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                     failed_kks << kks << " " << status.toString().toUtf8() << "\n";
                 }
                 sql = std::string("INSERT INTO dynamic_data (id,t,val,status) VALUES ");
-
+                bool not_empty = false;
     			for ( j=0; j<results[i].m_dataValues.length(); j++ )
     			{
     				UaStatus statusOPLevel(results[i].m_dataValues[j].StatusCode);
@@ -487,6 +487,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
     				sourceTS[10] = ' ';
                     if ( read_bad || OpcUa_IsGood(results[i].m_dataValues[j].StatusCode) )
     				{
+                        not_empty = true;
                         std::string value = UaVariant(results[i].m_dataValues[j].Value).toString().toUtf8();
                         if (!db) // using local csv file
                             csv_fstream<<kks<<","<<sourceTS.c_str()<<"," <<
@@ -519,7 +520,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
                 sql.pop_back();
                 sql.pop_back();
                 sql += ";";
-                if (j>0)
+                if (not_empty)
                 {
                     if (db)
                     {
