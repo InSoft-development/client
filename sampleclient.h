@@ -50,6 +50,7 @@ public:
     virtual void init_synchro(std::vector<std::string>) = 0;
     virtual void finalize_db() = 0;
     virtual int id(std::string) = 0;
+    virtual std::string now() = 0;
 };
 
 class sqlite_database : public database
@@ -62,6 +63,7 @@ public:
     void init_synchro(std::vector<std::string>);
     void finalize_db();
     int id(std::string);
+    std::string now() {return std::string("CURRENT_TIMESTAMP");}
 private:
     sqlite3 *sq_db;
 };
@@ -76,6 +78,7 @@ public:
     void init_synchro(std::vector<std::string>);
     void finalize_db();
     int id(std::string);
+    std::string now() {return std::string("now()");}
 private:
     clickhouse::Client* ch_db;
 };
@@ -95,7 +98,8 @@ public:
     UaStatus connect(std::string);
     UaStatus disconnect();
     UaStatus reconnect(int);
-    UaStatus read();
+    void online_db_init();
+    UaStatus read_online();
     UaStatus readHistory(const char*,const char*,int,int,bool);
     UaStatus subscribe();
     UaStatus unsubscribe();
@@ -115,6 +119,7 @@ private:
     unsigned short ns;
     std::map<std::string,std::vector<double>> slice_data;
     std::vector<std::string> kks_array;
+    std::string kks_string;
     FILE* kks_fstream;
     database* db;
     std::ofstream csv_fstream;

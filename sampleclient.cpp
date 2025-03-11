@@ -274,7 +274,31 @@ UaStatus SampleClient::reconnect(int p)
 
 }
 
-UaStatus SampleClient::read()
+void SampleClient::online_db_init()
+{
+    std::fstream infile("kks.csv");
+    std::string kks;
+
+    while (infile >> kks)
+    {
+        kks_array.push_back(kks);
+    }
+    for (auto k : kks_array)
+    {
+        kks_string += "\"" + k + "\",";
+    }
+    std::cout<<"KKS STRING:" << kks_string << "\n";
+
+    if (db)
+    {
+        db->init_synchro(kks_array);
+    }
+    else
+        csv_fstream<<kks_string<<"\n";
+}
+
+
+UaStatus SampleClient::read_online()
 {
     static int iteration_count;
     UaStatus          result;
@@ -285,20 +309,7 @@ UaStatus SampleClient::read()
     UaDiagnosticInfos diagnosticInfos;
     int item_index = 0;
 
-    std::string kks_string;
-    for (auto k : kks_array)
-    {
-        kks_string += "\'" + k + "\',";
-    }
-    kks_string += "\'timestamp\'";
 
-    if (db)
-    {
-        db->init_db(kks_array);
-        db->init_synchro(kks_array);
-    }
-    else
-        csv_fstream<<kks_string<<"\n";
 
 
     for (auto kks : kks_array)
@@ -357,9 +368,9 @@ UaStatus SampleClient::read()
             else
                 value_string += "null,";
         }
-        value_string += "CURRENT_TIMESTAMP";
+        value_string += db->now();
 
-        std::string sql = std::string("INSERT INTO synchro_data ( ") + kks_string + ") VALUES(" +
+        std::string sql = std::string("INSERT INTO synchro_data ( ") + kks_string + " timestamp) VALUES(" +
                 value_string + ");";
         std::cout<< "\n SQL:\n" << sql<< "\n";
         /* Execute SQL statement */
@@ -974,6 +985,11 @@ sqlite_database::~sqlite_database()
 
 void sqlite_database::init_synchro(std::vector<std::string> kks_array)
 {
+    if (kks_array.size()==0)
+    {
+        printf("no data in kks.csv");
+        return;
+    }
     printf("init sqlite tables\n");
     if (rewrite)
     {
@@ -1138,7 +1154,7 @@ clickhouse_database::clickhouse_database(bool r, const char* server)
     printf("Initialize client connection\n");
     ch_db = new clickhouse::Client(clickhouse::ClientOptions().SetHost(server)
                                    .SetUser("default")
-                                   .SetPassword("asdf"));
+                                   .SetPassword(""));
     rewrite = r;
 }
 
@@ -1150,6 +1166,11 @@ clickhouse_database::~clickhouse_database()
 
 void clickhouse_database::init_synchro(std::vector<std::string> kks_array)
 {
+    if (kks_array.size()==0)
+    {
+        printf("no data in kks.csv");
+        return;
+    }
     printf("init clickhouse tables\n");
     if (rewrite)
     {
@@ -1206,7 +1227,7 @@ void clickhouse_database::init_db(std::vector<std::string> kks_array)
     /* Create SQL statement */
     sql = std::string("CREATE TABLE IF NOT EXISTS  dynamic_data ( id UInt64, t DateTime64(3,'Europe/Moscow'), "
                       "val Float64, status UInt64 ) ENGINE = MergeTree()"
-                      " PARTITION BY (id,toYYYYMM(t)) ORDER BY (t) PRIMARY KEY (id,t)");
+                      " PARTITION BY (id,toYYYYMM(t)) ORDER BY (id,t) PRIMARY KEY (id,t)");
     printf("%s\n",sql.c_str());
     /* Execute SQL statement */
     exec(sql.c_str());

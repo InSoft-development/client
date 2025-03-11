@@ -286,9 +286,10 @@ use more short intervals (one month for example) foe big tags\n\
         if (online)
         {
             // Read values one time
+            pMyClient->online_db_init();
             while(!exit_flag)
             {
-                status_run = pMyClient->read();
+                status_run = pMyClient->read_online();
                 UaThread::msleep(delta);
             }
         }
