@@ -42,13 +42,14 @@ static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
    return 0;
 }
 
-SampleSubscription::SampleSubscription(int d)
+SampleSubscription::SampleSubscription(int d, std::string k="kks.csv")
 : m_pSession(NULL),
   m_pSubscription(NULL)
 {
 	kks_array = NULL;
 	db = NULL;
 	delta = d;
+    kks_file = k;
 }
 
 SampleSubscription::~SampleSubscription()
@@ -77,63 +78,66 @@ void SampleSubscription::dataChange(
     const UaDataNotifications& dataNotifications,        //!< [in] List of data notifications sent by the server
     const UaDiagnosticInfos&   diagnosticInfos)          //!< [in] List of diagnostic info related to the data notifications. This list can be empty.
 {
-   char *zErrMsg = 0;
-   int rc;
-   std::string sql;
-
-
+//   char *zErrMsg = 0;
+//   int rc;
+//   std::string sql;
+//    printf("-- DataChange Notification ---------------------------------\n");
     OpcUa_ReferenceParameter(clientSubscriptionHandle); // We use the callback only for this subscription
     OpcUa_ReferenceParameter(diagnosticInfos);
     OpcUa_UInt32 i = 0;
 
-    printf("-- DataChange Notification ---------------------------------\n");
+
     for ( i=0; i<dataNotifications.length(); i++ )
     {
         if ( OpcUa_IsGood(dataNotifications[i].Value.StatusCode) )
         {
             UaVariant tempValue = dataNotifications[i].Value.Value;
-
-
-            std::string kks_name = kks_array[dataNotifications[i].ClientHandle];
-
+            time_t time = UaDateTime(dataNotifications[i].Value.SourceTimestamp).toTime_t(); //. dwHighDateTime;
             OpcUa_Double val;
-			tempValue.toDouble(val);
-			(slice_data[kks_name])[iteration_count[kks_name]] = val;
-			//std::cout<<  kks_name << "[" << iteration_count[kks_name] << "]" <<  " = " << tempValue.toString().toUtf8() << "==" << val << "\n";
-            if (iteration_count[kks_name] < N-1)
-            {
+            std::string kks_name = kks_array[dataNotifications[i].ClientHandle];
+            std::string value_str = UaVariant(tempValue).toString().toUtf8();
+            if (value_str == "true") val = 1;
+            if (value_str == "false") val = 0;
+            else tempValue.toDouble(val);
 
-            	iteration_count[kks_name]++;
-            }
-            else
-            {
-            	double mean = 0;
+            std::cout<<  "id: " << kks_name <<" , source timestamp: " <<time << ", val: " << val << "\n";
 
-            	for (int j = 0; j < N; j ++)
-            	{
-            		std::cout<<slice_data[kks_name][j]<<" ";
-            		mean += slice_data[kks_name][j];
-            	}
-            	mean/=N;
-            	std::cout << kks_name << " = " << mean << "\n";
-				/* Create SQL statement */
-				sql = std::string("INSERT INTO dynamic_data (id,t,val) VALUES (\"") +
-						kks_name +
-				   std::string("\" , DateTime('now'), ") +
-						   std::to_string(mean) + ");";
-				//printf("%s\n",sql.c_str());
-				/* Execute SQL statement */
-				rc = sqlite3_exec(db, sql.c_str(), callback, 0, &zErrMsg);
-				if( rc != SQLITE_OK ){
-				fprintf(stderr, "SQL error: %s\n", zErrMsg);
-					sqlite3_free(zErrMsg);
-				}
-				for (int j = 0; j < N; j ++)
-				{
-					slice_data[kks_name][j] = 0;
-				}
-				iteration_count[kks_name] = 0;
-            }
+            //			(slice_data[kks_name])[iteration_count[kks_name]] = val;
+//			std::cout<<  "id: " << kks_name << "[" << iteration_count[kks_name] << "]" <<  " = " << tempValue.toString().toUtf8() << "==" << val << "\n";
+//            if (iteration_count[kks_name] < N-1)
+//            {
+
+//            	iteration_count[kks_name]++;
+//            }
+//            else
+//            {
+//            	double mean = 0;
+
+//            	for (int j = 0; j < N; j ++)
+//            	{
+//            		std::cout<<slice_data[kks_name][j]<<" ";
+//            		mean += slice_data[kks_name][j];
+//            	}
+//            	mean/=N;
+//            	std::cout << kks_name << " = " << mean << "\n";
+//				/* Create SQL statement */
+//				sql = std::string("INSERT INTO dynamic_data (id,t,val) VALUES (\"") +
+//						kks_name +
+//				   std::string("\" , DateTime('now'), ") +
+//						   std::to_string(mean) + ");";
+//				//printf("%s\n",sql.c_str());
+//				/* Execute SQL statement */
+//				rc = sqlite3_exec(db, sql.c_str(), callback, 0, &zErrMsg);
+//				if( rc != SQLITE_OK ){
+//				fprintf(stderr, "SQL error: %s\n", zErrMsg);
+//					sqlite3_free(zErrMsg);
+//				}
+//				for (int j = 0; j < N; j ++)
+//				{
+//					slice_data[kks_name][j] = 0;
+//				}
+//				iteration_count[kks_name] = 0;
+//            }
         }
         else
         {
@@ -141,7 +145,7 @@ void SampleSubscription::dataChange(
             fprintf(stderr, "  Variable %s failed with status %s\n", kks_array[dataNotifications[i].ClientHandle].c_str(), itemError.toString().toUtf8());
         }
     }
-    printf("------------------------------------------------------------\n");
+//    printf("------------------------------------------------------------\n");
 
 
 
@@ -193,7 +197,7 @@ UaStatus SampleSubscription::createSubscription(UaSession* pSession)
     SubscriptionSettings subscriptionSettings;
     subscriptionSettings.publishingInterval = delta;
 
-    printf("\nCreating subscription ...\n");
+//    printf("\nCreating subscription ...\n");
     result = pSession->createSubscription(
         serviceSettings,
         this,
@@ -204,7 +208,7 @@ UaStatus SampleSubscription::createSubscription(UaSession* pSession)
 
     if (result.isGood())
     {
-        printf("CreateSubscription succeeded\n");
+//        printf("CreateSubscription succeeded\n");
     }
     else
     {
@@ -227,14 +231,14 @@ UaStatus SampleSubscription::deleteSubscription()
     ServiceSettings serviceSettings;
 
     // let the SDK cleanup the resources for the existing subscription
-    printf("\nDeleting subscription ...\n");
+//    printf("\nDeleting subscription ...\n");
     result = m_pSession->deleteSubscription(
         serviceSettings,
         &m_pSubscription);
 
     if (result.isGood())
     {
-        printf("DeleteSubscription succeeded\n");
+//        printf("DeleteSubscription succeeded\n");
     }
     else
     {
@@ -253,7 +257,7 @@ UaStatus SampleSubscription::createMonitoredItems()
         fprintf(stderr, "\nError: No Subscription created\n");
         return OpcUa_BadInvalidState;
     }
-
+//    printf("create items\n");
     UaStatus result;
     OpcUa_UInt32 i;
     ServiceSettings serviceSettings;
@@ -262,12 +266,13 @@ UaStatus SampleSubscription::createMonitoredItems()
     
     UaMonitoredItemCreateResults createResults;
 
-    std::fstream infile("kks.csv");
+    std::fstream infile(kks_file.c_str());
     int ns = 1;
     int item_index = 0;
     std::string kks;
     while (infile >> kks)
     {
+//        printf("%s\n", kks.c_str());
     	itemsToCreate.resize(item_index+1);
     	itemsToCreate[item_index].ItemToMonitor.AttributeId = OpcUa_Attributes_Value;
     	UaNodeId test(UaString(kks.c_str()),ns);
@@ -277,13 +282,13 @@ UaStatus SampleSubscription::createMonitoredItems()
     	itemsToCreate[item_index].RequestedParameters.QueueSize = 1;
     	itemsToCreate[item_index].RequestedParameters.DiscardOldest = OpcUa_True;
     	itemsToCreate[item_index].MonitoringMode = OpcUa_MonitoringMode_Reporting;
-	printf("%d%s\n",item_index,kks.c_str());
+//        printf("%d%s\n",item_index,kks.c_str());
 	item_index++;
     }
     infile.close();
 
     kks_array = new std::string[item_index];
-    std::fstream infile_reoprn("kks.csv");
+    std::fstream infile_reoprn(kks_file.c_str());
     item_index = 0;
     while (infile_reoprn >> kks)
     {
@@ -292,9 +297,9 @@ UaStatus SampleSubscription::createMonitoredItems()
     	item_index++;
 	}
 
-    init_db();
+//    init_db();
 
-    printf("\nAdding monitored items to subscription ...\n");
+//    printf("\nAdding monitored items to subscription ...\n");
     result = m_pSubscription->createMonitoredItems(
         serviceSettings,
         OpcUa_TimestampsToReturn_Both,
@@ -308,8 +313,8 @@ UaStatus SampleSubscription::createMonitoredItems()
         {
             if (OpcUa_IsGood(createResults[i].StatusCode))
             {
-                printf("CreateMonitoredItems succeeded for item: %s\n",
-                    UaNodeId(itemsToCreate[i].ItemToMonitor.NodeId).toXmlString().toUtf8());
+//                printf("CreateMonitoredItems succeeded for item: %s\n",
+//                    UaNodeId(itemsToCreate[i].ItemToMonitor.NodeId).toXmlString().toUtf8());
             }
             else
             {

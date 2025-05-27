@@ -30,6 +30,8 @@
 #include <getopt.h>
 #include <string>
 #include <csignal>
+#include <ctime>
+#include <thread>
 
 UaStatus status_run;
 SampleClient* pMyClient;
@@ -45,11 +47,12 @@ void signalHandler(int signum)
        else {
 //           if (status_run.isGood())
 //           {
-//               //pMyClient->unsubscribe();
+//               //
 //               pMyClient->disconnect(); // deprecated: in destructor
 //           }
            if (pMyClient)
            {
+               pMyClient->unsubscribe();
                pMyClient->disconnect();
                delete pMyClient;
                pMyClient = NULL;
@@ -94,6 +97,8 @@ int main(int argc, char*argv[])
             {"kks", 0, NULL,'k'},
             {"recursive", 0, NULL,'c'},
             {"opc-server",0,NULL,'a'},
+            {"subscription",0,NULL,'S'},
+            {"kks-file",0,NULL,'K'},
             {0, 0, 0, 0}
 	};
 
@@ -108,14 +113,16 @@ int main(int argc, char*argv[])
     bool read_bad = false;
     bool kks_mode = false;
     bool history_mode = true;
+    bool subscription_mode = false;
     std::string kks = "";
+    std::string kks_file = "kks.csv";
     std::string recursive = "false";
     std::string clickhouse = "";
     std::string csv_file = "";
     std::string opc_server = "";
 	// loop over all of the options
 	int ch;
-    while ((ch = getopt_long(argc, argv, "hou:f:d:m:s:b:e:p:t:rnwxk:ic:a:", long_options, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "hou:f:d:m:s:b:e:p:t:rnwxk:ic:a:SK:", long_options, NULL)) != -1)
 	{
 	    // check to see if a single character or long option came through
 	    switch (ch)
@@ -127,6 +134,7 @@ int main(int argc, char*argv[])
 --clickhouse-server (-u) clickhouse server ip (table dynamic_data and static_data would be used)\n\
 --file (-f) store result in local csv file\n\
 --ns(-s) number of space (1 by default)\n\
+--kks-file (-K) specify kks file (defult kks.csv)\n\
 KKS  MODE:\n\
 --kks(-k) <id> kks browse mode. List subobjects from <id> object. \"all\" - from root folder, \"begin\" - \
 from begin of object folder. Results would be printed to out - or file, if  (-f) used \n\
@@ -137,6 +145,8 @@ ONLINE:\n\
 --delta(-d) miliseconds between reading from OPC UA, default 1000\n\
 --mean(-m) count of averaging: 1 means we don't calculate average and send each slice to DB, \
 5 - we calculate 5 slices to one mean and send it to DB. default 5\n\
+SUBSCRIPTION:\n\
+--subscription(-S) subscription mode\n\
 HISTORY MODE:\n\
 --history(-i) history mode (default)\n\
 --begin(-b) <timestamp> in YYYY-MM-DDTHH:MM:SS.MMMZ format (e.g. 2021-06-01T00:00:00.000Z\n\
@@ -224,9 +234,19 @@ use more short intervals (one month for example) foe big tags\n\
                online = false;
                printf("read history, ");
                break;
+            case 'S':
+                subscription_mode = true;
+                history_mode = false;
+                online = false;
+//                printf("subscription, ");
+                break;
             case 'a':
                 opc_server = optarg;
                 printf("opc_server %s, ", recursive.c_str());
+                break;
+            case 'K':
+                kks_file = optarg;
+                printf("kks file %s, ", kks_file.c_str());
                 break;
 
 
@@ -247,7 +267,6 @@ use more short intervals (one month for example) foe big tags\n\
         else
             printf("list of subobjects from id= %s, ", kks.c_str());
 
-
     }
     else if (history_mode)
     {
@@ -267,19 +286,26 @@ use more short intervals (one month for example) foe big tags\n\
         printf("timeout = %i, ", timeout);
         printf("read bounds = %s \n", read_bounds?"true":"false");
     }
+    else if (subscription_mode)
+    {
+//        printf("subscription");
+
+    }
+    else {
+        exit(1);
+    }
     if (clickhouse != "")
         printf("using clickhouse\n");
-    printf("rewrite = %s \n", rewrite?"true":"false");
+//    printf("rewrite = %s \n", rewrite?"true":"false");
 
     // Initialize the UA Stack platform layer
     UaPlatformLayer::init();
 
     // Create instance of SampleClient
-    pMyClient = new SampleClient(delta,mean,ns,rewrite,read_bad,clickhouse,csv_file);
+    pMyClient = new SampleClient(delta,mean,ns,rewrite,read_bad,clickhouse,csv_file,kks_file);
 
     // Connect to OPC UA Server
     status_run = pMyClient->connect(opc_server);
-
     // Connect succeeded
     if (status_run.isGood())
     {
@@ -289,8 +315,9 @@ use more short intervals (one month for example) foe big tags\n\
             pMyClient->online_db_init();
             while(!exit_flag)
             {
+                auto start  = std::chrono::system_clock::now();
                 status_run = pMyClient->read_online();
-                UaThread::msleep(delta);
+                std::this_thread::sleep_until(start + std::chrono::milliseconds(delta));
             }
         }
         else if (kks_mode)
@@ -301,24 +328,15 @@ use more short intervals (one month for example) foe big tags\n\
         {
             status_run = pMyClient->readHistory(begin.c_str(),end.c_str(),pause,timeout,read_bounds);
         }
+        else if (subscription_mode)
+        {
+//            status_run = pMyClient->read_once();
 
+            status_run = pMyClient->subscribe();
+            while(!exit_flag)
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        // Wait for user command.
-        //printf("\nPress Enter to create subscription\n");
-        //printf("Press Enter again to stop subscription\n");
-        //getchar();
-
-        // Create subscription
-//        status_run = pMyClient->subscribe();
-
-//        if (status_run.isGood())
-//        {
-//            // Wait for user command.
-//            getchar();
-
-//            // Delete subscription
-//            status = pMyClient->unsubscribe();
-//        }
+        }
 
 //        // Wait for user command.
 //        //printf("\nPress Enter to disconnect\n");
@@ -329,9 +347,9 @@ use more short intervals (one month for example) foe big tags\n\
     }
 
     // Close application
-    //printf("\nPress Enter to close\n");
+//    printf("\nPress Enter to close\n");
     // Wait for user command.
-    //getchar();
+//    getchar();
 
     delete pMyClient;
     pMyClient = NULL;

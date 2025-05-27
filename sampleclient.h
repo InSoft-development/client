@@ -87,7 +87,7 @@ class SampleClient : public UaSessionCallback
 {
     UA_DISABLE_COPY(SampleClient);
 public:
-    SampleClient(int,int,int,bool,bool,std::string,std::string);
+    SampleClient(int,int,int,bool,bool,std::string,std::string, std::string);
     virtual ~SampleClient();
 
     // UaSessionCallback implementation ----------------------------------------------------
@@ -100,6 +100,7 @@ public:
     UaStatus reconnect(int);
     void online_db_init();
     UaStatus read_online();
+    UaStatus read_once();
     UaStatus readHistory(const char*,const char*,int,int,bool);
     UaStatus subscribe();
     UaStatus unsubscribe();
@@ -112,6 +113,7 @@ public:
 private:
     UaSession*          m_pSession;
     std::string url;
+    std::string kks_file;
     SampleSubscription* m_pSampleSubscription;
     bool read_bad;
     int delta;

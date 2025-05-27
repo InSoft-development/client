@@ -41,7 +41,7 @@ class SampleSubscription :
 {
     UA_DISABLE_COPY(SampleSubscription);
 public:
-    SampleSubscription(int);
+    SampleSubscription(int, std::string);
     virtual ~SampleSubscription();
 
     // UaSubscriptionCallback implementation ----------------------------------------------------
@@ -72,6 +72,7 @@ private:
     std::map<std::string,double[N]> slice_data;
     std::string* kks_array;
     std::map<std::string,int> iteration_count;
+    std::string kks_file;
 
     sqlite3 *db;
 };

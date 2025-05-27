@@ -53,7 +53,7 @@ void signalHandler_for_browse(int signum)
        }
 }
 
-SampleClient::SampleClient(int d, int m, int n = 1, bool r=false, bool b=false, std::string c = "",std::string f = "")
+SampleClient::SampleClient(int d, int m, int n = 1, bool r=false, bool b=false, std::string c = "",std::string f = "", std::string k ="kks.csv")
 {
     m_pSession = new UaSession();
     db = nullptr;
@@ -61,6 +61,7 @@ SampleClient::SampleClient(int d, int m, int n = 1, bool r=false, bool b=false, 
     mean = m;
     ns = n;
     read_bad = b;
+    kks_file = k;
     if (c !="" && f !="")\
     {
         printf("Can not use clickhouse and csv together\n");
@@ -68,8 +69,8 @@ SampleClient::SampleClient(int d, int m, int n = 1, bool r=false, bool b=false, 
     }
     if (c == "" && f == "")
     {
-        printf("using local data.sqlite\n");
-        db = new sqlite_database(r,"data.sqlite");
+        //printf("using local data.sqlite\n");
+        //db = new sqlite_database(r,"data.sqlite");
 
     }
     else if (c != "")
@@ -94,7 +95,7 @@ SampleClient::SampleClient(int d, int m, int n = 1, bool r=false, bool b=false, 
         }
 
     }
-    m_pSampleSubscription = new SampleSubscription(delta);
+//    m_pSampleSubscription = new SampleSubscription(delta);
 }
 
 SampleClient::~SampleClient()
@@ -103,7 +104,7 @@ SampleClient::~SampleClient()
     {
         // delete local subscription object
         delete m_pSampleSubscription;
-        m_pSampleSubscription = NULL;
+//        m_pSampleSubscription = NULL;
     }
 
     if (m_pSession->isConnected() == OpcUa_True)
@@ -111,7 +112,7 @@ SampleClient::~SampleClient()
         // disconnect if we're still connected
         disconnect();
         delete m_pSession;
-        m_pSession = NULL;
+//        m_pSession = NULL;
     }
 
     if (db != nullptr)
@@ -137,7 +138,7 @@ static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
 
 void SampleClient::init_db()
 {
-    std::fstream infile("kks.csv");
+    std::fstream infile(kks_file.c_str());
     std::string kks;
 
     while (infile >> kks)
@@ -154,14 +155,14 @@ void SampleClient::connectionStatusChanged(
 {
     OpcUa_ReferenceParameter(clientConnectionId);
 
-    printf("-------------------------------------------------------------\n");
+//    printf("-------------------------------------------------------------\n");
     switch (serverStatus)
     {
     case UaClient::Disconnected:
-        printf("\nConnection status changed to Disconnected\n");
+//        printf("\nConnection status changed to Disconnected\n");
         break;
     case UaClient::Connected:
-        printf("\nConnection status changed to Connected\n");
+//        printf("\nConnection status changed to Connected\n");
         break;
     case UaClient::ConnectionWarningWatchdogTimeout:
         fprintf(stderr,"Error: Connection status changed to ConnectionWarningWatchdogTimeout\n");
@@ -176,7 +177,7 @@ void SampleClient::connectionStatusChanged(
         fprintf(stderr, "Error: Connection status changed to NewSessionCreated\n");
         break;
     }
-    printf("-------------------------------------------------------------\n");
+//    printf("-------------------------------------------------------------\n");
 }
 
 UaStatus SampleClient::connect(std::string server_opt)
@@ -209,7 +210,7 @@ UaStatus SampleClient::connect(std::string server_opt)
     // Security settings are not initialized - we connect without security for now
     SessionSecurityInfo sessionSecurityInfo;
 
-    printf("\nConnecting to %s\n", sURL.toUtf8());
+//    printf("\nConnecting to %s\n", sURL.toUtf8());
     result = m_pSession->connect(
         sURL,
         sessionConnectInfo,
@@ -218,7 +219,7 @@ UaStatus SampleClient::connect(std::string server_opt)
 
     if (result.isGood())
     {
-        printf("Connect succeeded\n");
+//        printf("Connect succeeded\n");
     }
     else
     {
@@ -229,7 +230,6 @@ UaStatus SampleClient::connect(std::string server_opt)
 //    std::cout<<"m_pSession->getServerProductUri().toUtf8() "<<m_pSession->getServerProductUri().toUtf8();
 //    std::cout<<"m_pSession->getServerApplicationUri().toUtf8() "<<m_pSession->getServerApplicationUri().toUtf8();
 //    std::cout<<"m_pSession->currentlyUsedEndpointUrl().toUtf8() "<<m_pSession->currentlyUsedEndpointUrl().toUtf8();
-
 
     return result;
 }
@@ -276,7 +276,7 @@ UaStatus SampleClient::reconnect(int p)
 
 void SampleClient::online_db_init()
 {
-    std::fstream infile("kks.csv");
+    std::fstream infile(kks_file.c_str());
     std::string kks;
 
     while (infile >> kks)
@@ -297,6 +297,58 @@ void SampleClient::online_db_init()
         csv_fstream<<kks_string<<"\n";
 }
 
+UaStatus SampleClient::read_once()
+{
+    UaStatus          result;
+    ServiceSettings   serviceSettings;
+    UaReadValueIds    nodeToRead;
+    nodeToRead.create(1);
+    UaDataValues      values;
+    UaDiagnosticInfos diagnosticInfos;
+    int item_index = 0;
+
+
+
+    std::fstream infile(kks_file.c_str());
+    std::string kks;
+
+    while (infile >> kks)
+    {
+        nodeToRead.resize(item_index+1);
+        nodeToRead[item_index].AttributeId = OpcUa_Attributes_Value;
+        UaNodeId test(UaString(kks.c_str()),ns);
+        test.copyTo(&nodeToRead[item_index].NodeId);
+        result = m_pSession->read(
+            serviceSettings,
+            0,
+            OpcUa_TimestampsToReturn_Both,
+            nodeToRead,
+            values,
+            diagnosticInfos);
+
+        if (result.isGood())
+        {
+                    UaVariant tempValue = values[0].Value;
+                    unsigned int timeValueHigh = values[0].SourceTimestamp.dwHighDateTime;
+                    unsigned int timeValueLow = values[0].SourceTimestamp.dwLowDateTime;
+                    OpcUa_Double val;
+                    std::string value_str = UaVariant(tempValue).toString().toUtf8();
+                    if (value_str == "true") val = 1;
+                    if (value_str == "false") val = 0;
+                    else tempValue.toDouble(val);
+
+                    double value = val;
+                    std::cout<<  "id: " << kks <<" , source timestamp: " <<timeValueHigh << " " << timeValueLow << ", val: " << value << "\n";
+
+        }
+        else
+        {
+            fprintf(stderr, "Error: Read failed with status %s\n", result.toString().toUtf8());
+        break;
+        }
+    }
+    return result;
+}
 
 UaStatus SampleClient::read_online()
 {
@@ -364,7 +416,11 @@ UaStatus SampleClient::read_online()
         for (auto k : kks_array)
         {
             if (slice_data[k].size())
+            {
                 value_string += std::to_string(std::accumulate(slice_data[k].begin(), slice_data[k].end(), 0.0)/ slice_data[k].size()) + ",";
+                slice_data[k].clear();
+            }
+
             else
                 value_string += "null,";
         }
@@ -419,7 +475,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
 
 
 
-    std::fstream infile("kks.csv");
+    std::fstream infile(kks_file.c_str());
     std::ofstream failed_kks("failed_kks.csv");
     int item_index = 0;
     std::string kks;
@@ -678,7 +734,7 @@ UaStatus SampleClient::readHistory(const char* t1, const char* t2, int pause, in
 UaStatus SampleClient::subscribe()
 {
     UaStatus result;
-
+    m_pSampleSubscription = new SampleSubscription(delta, kks_file);
     result = m_pSampleSubscription->createSubscription(m_pSession);
     if ( result.isGood() )
     {
@@ -689,13 +745,16 @@ UaStatus SampleClient::subscribe()
 
 UaStatus SampleClient::unsubscribe()
 {
-    return m_pSampleSubscription->deleteSubscription();
+    if (m_pSampleSubscription)
+        return m_pSampleSubscription->deleteSubscription();
+    else return OpcUa_GoodDataIgnored;
 }
 
 UaStatus SampleClient::browseSimple(std::string kks, std::string recursive, std::string csv_file)//const UaNodeId& nodeToBrowse, OpcUa_UInt32 maxReferencesToReturn)
 {
     UaStatus result;
     UaNodeId nodeToBrowse;
+    printf("1\n");
     if (kks == "all")
     {
         nodeToBrowse = UaNodeId(OpcUaId_RootFolder);
@@ -711,6 +770,8 @@ UaStatus SampleClient::browseSimple(std::string kks, std::string recursive, std:
     browse_internal = true;
     signal(SIGINT, signalHandler_for_browse);
     signal(SIGTERM, signalHandler_for_browse);
+
+    printf("3\n");
 
     result = browseInternal(nodeToBrowse, 0, recursive);
     if (csv_file != "") std::fclose(kks_fstream);
@@ -731,7 +792,7 @@ UaStatus SampleClient::browseInternal(const UaNodeId& nodeToBrowse, OpcUa_UInt32
     browseContext.includeSubtype = OpcUa_True;
     browseContext.nodeClassMask=2;
     browseContext.maxReferencesToReturn = maxReferencesToReturn;
-//    printf("\nBrowsing from Node %s...\n", nodeToBrowse.toXmlString().toUtf8());
+    printf("\nBrowsing from Node %s...\n", nodeToBrowse.toXmlString().toUtf8());
     result = m_pSession->browse(
         serviceSettings,
         nodeToBrowse,
@@ -801,7 +862,7 @@ void SampleClient::printBrowseResults(const UaReferenceDescriptions& referenceDe
         std::string kks_name, type="", description="";
         nodeToRead.resize(1);
         UaNodeId nodeId(referenceDescriptions[i].NodeId.NodeId);
-        //std::cout<<nodeId.toString().toUtf8()<<"\n";
+        std::cout<<nodeId.toString().toUtf8()<<"\n";
 
         nodeToRead[0].AttributeId = OpcUa_Attributes_Description;
         UaNodeId test(UaString(nodeId.toString().toUtf8()),ns);
