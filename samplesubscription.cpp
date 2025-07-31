@@ -100,8 +100,8 @@ void SampleSubscription::dataChange(
             if (value_str == "false") val = 0;
             else tempValue.toDouble(val);
 
-            std::cout<<  "id: " << kks_name <<" , source timestamp: " <<time << ", val: " << val << "\n";
-
+            std::cout<< "\"-\" \""<< kks_name <<"\" \"" <<time << "\" \"" << val << "\""<< std::endl	;
+		//"-" "INCONT.as_M.AM.10HAD99AM001-AM_1.Q" "1747934810" "45"
             //			(slice_data[kks_name])[iteration_count[kks_name]] = val;
 //			std::cout<<  "id: " << kks_name << "[" << iteration_count[kks_name] << "]" <<  " = " << tempValue.toString().toUtf8() << "==" << val << "\n";
 //            if (iteration_count[kks_name] < N-1)

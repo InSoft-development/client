@@ -56,6 +56,7 @@ void signalHandler_for_browse(int signum)
 SampleClient::SampleClient(int d, int m, int n = 1, bool r=false, bool b=false, std::string c = "",std::string f = "", std::string k ="kks.csv")
 {
     m_pSession = new UaSession();
+    m_pSampleSubscription = NULL;
     db = nullptr;
     delta = d;
     mean = m;
